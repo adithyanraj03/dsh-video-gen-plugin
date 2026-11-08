@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { apply } from '../src/index.js'
-import { CANCEL_ROUTE, JOBS_ROUTE, SETTINGS_HEALTH_ROUTE, TEST_CONNECTION_ROUTE, THUMB_ROUTE, VIDEO_ROUTE } from '../src/shared.js'
+import { CANCEL_ROUTE, CREDENTIAL_ROUTE, JOBS_ROUTE, MODELS_ROUTE, SETTINGS_HEALTH_ROUTE, TEST_CONNECTION_ROUTE, THUMB_ROUTE, VIDEO_ROUTE } from '../src/shared.js'
 
 /** Minimal cordis Context with just the surfaces this fiber touches. */
 function fakeContext(options: { withWeb?: boolean; settingsInstaller?: boolean } = {}) {
@@ -24,6 +24,14 @@ function fakeContext(options: { withWeb?: boolean; settingsInstaller?: boolean }
       return typeof cleanup === 'function' ? cleanup : () => undefined
     },
     connection: { requestRejection: () => undefined },
+    get: () => undefined,
+    slots: {
+      register: () => () => undefined,
+      inject: (_key: string, callback: () => unknown) => {
+        callback()
+        return () => undefined
+      },
+    },
   }
   if (options.withWeb !== false) {
     ctx.webServer = { register: (route: { path: string; kind: string }) => { routes.push(route); return () => undefined } }
@@ -73,7 +81,7 @@ describe('fiber registration', () => {
     const { ctx, routes } = fakeContext()
     apply(ctx, {})
     const paths = routes.map(route => route.path).sort()
-    expect(paths).toEqual([CANCEL_ROUTE, JOBS_ROUTE, SETTINGS_HEALTH_ROUTE, TEST_CONNECTION_ROUTE, THUMB_ROUTE, VIDEO_ROUTE].sort())
+    expect(paths).toEqual([CANCEL_ROUTE, CREDENTIAL_ROUTE, JOBS_ROUTE, MODELS_ROUTE, SETTINGS_HEALTH_ROUTE, TEST_CONNECTION_ROUTE, THUMB_ROUTE, VIDEO_ROUTE].sort())
   })
 
   it('still loads without a web server, so headless profiles keep the tools', () => {

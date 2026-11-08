@@ -14,8 +14,38 @@ export const THUMB_ROUTE = '/plugins/dsh-video-gen/thumb'
 export const JOBS_ROUTE = '/plugins/dsh-video-gen/jobs'
 /** Same-origin route cancelling one queued or running job. */
 export const CANCEL_ROUTE = '/plugins/dsh-video-gen/cancel'
-/** Same-origin route probing Ninfer reachability and the stored token. */
+/** Same-origin route probing one endpoint and listing its models (settings card). */
+export const MODELS_ROUTE = '/plugins/dsh-video-gen/models'
+/** Same-origin route storing and describing one API key reference. */
+export const CREDENTIAL_ROUTE = '/plugins/dsh-video-gen/credential'
+/** Same-origin route probing the active endpoint (kept for compatibility). */
 export const TEST_CONNECTION_ROUTE = '/plugins/dsh-video-gen/test'
+
+/** Cap on how many endpoints one settings page may hold. */
+export const MAX_CONNECTIONS = 12
+
+/** Prefix of the per-endpoint credential reference a fresh row starts with. */
+export const KEY_REF_PREFIX = 'VIDEO_GEN_KEY_'
+
+/**
+ * Credential-key segment for one connection id, scoped under {@link KEY_REF_PREFIX}.
+ * The host stores the token per connection so two endpoints never share a key.
+ */
+export function defaultKeyRef(connectionId: string): string {
+  const slug = connectionId.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  return slug.length === 0 ? 'DEFAULT' : slug.slice(0, 40)
+}
+
+/** Url-safe slug for a new connection id derived from its label. */
+export function connectionSlug(label: string, taken: readonly string[] = []): string {
+  const base = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'endpoint'
+  if (!taken.includes(base)) return base
+  for (let index = 2; index < 100; index += 1) {
+    const candidate = `${base}-${String(index)}`
+    if (!taken.includes(candidate)) return candidate
+  }
+  return `${base}-${String(Date.now())}`
+}
 /** Non-secret settings capability probe, served even when the host cannot build a form. */
 export const SETTINGS_HEALTH_ROUTE = '/plugins/dsh-video-gen/settings-health'
 
@@ -25,19 +55,8 @@ export interface SettingsHealth {
   liveSchema: boolean
 }
 
-/** Every video backend this build can talk to. */
-export const VIDEO_PROVIDERS = ['ninfer'] as const
-export type VideoProvider = (typeof VIDEO_PROVIDERS)[number]
-
-/** Locale-neutral provider names for tool errors and status lines. */
-export const PROVIDER_DISPLAY_NAMES: Record<VideoProvider, string> = {
-  ninfer: 'Ninfer LTX-2.5',
-}
-
-/** Default Ninfer endpoint, model, and the credential reference its token lives under. */
-export const DEFAULT_NINFER_BASE_URL = 'https://ninfer.neronexusai.com/v1'
-export const DEFAULT_NINFER_MODEL = 'ltx-2.5'
-export const NINFER_API_KEY_ENV = 'NINFER_API_KEY'
+/** Credential reference a config-only setup falls back to when it names none. */
+export const DEFAULT_API_KEY_REF = 'VIDEO_API_KEY'
 
 /** Clip length, frame rate, and prompt limits enforced by the API. */
 export const MIN_SECONDS = 1
@@ -108,7 +127,8 @@ export type JobStatus = (typeof JOB_STATUSES)[number]
 /** One video job as the store keeps it. Paths are absolute host paths. */
 export interface VideoJobRecord {
   id: string
-  provider: VideoProvider
+  /** Endpoint id the clip was submitted to; keeps history readable across endpoints. */
+  provider: string
   model: string
   prompt: string
   status: JobStatus

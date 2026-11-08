@@ -1,12 +1,10 @@
-/** Bundle configuration for the Ninfer video backend. */
+/** Bundle configuration: a list of user-supplied video endpoints. */
 import z from '@deepseek-ai/schemastery'
 import {
   DEFAULT_FPS,
   DEFAULT_JOB_HISTORY,
   DEFAULT_JOB_TIMEOUT_MS,
   DEFAULT_MAX_VIDEO_BYTES,
-  DEFAULT_NINFER_BASE_URL,
-  DEFAULT_NINFER_MODEL,
   DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_SECONDS,
   DEFAULT_SIZE,
@@ -15,14 +13,11 @@ import {
   MAX_POLL_INTERVAL_MS,
   MAX_SECONDS,
   MIN_FPS,
-  NINFER_API_KEY_ENV,
   ORIENTATIONS,
   TOOL_NAME_SET_VALUES,
-  VIDEO_GENERATION_ENTRY_ID,
-  VIDEO_PROVIDERS,
+  defaultKeyRef,
   type Orientation,
   type ToolNameSet,
-  type VideoProvider,
 } from './shared.js'
 
 /**
@@ -37,14 +32,47 @@ function volatile<T extends z>(schema: T): T {
   return typeof mark === 'function' ? mark.call(schema) : schema
 }
 
-/** Cordis configuration schema; the plain type is `Config`. */
+/**
+ * One user-supplied video endpoint. The API it must speak is the OpenAI-style
+ * asynchronous video API (`POST /videos`, `GET /videos/{id}`, `GET
+ * /videos/{id}/content`), which is what the harness renders, not a vendor.
+ */
+export interface VideoConnection {
+  /** Stable id; also the credential-key segment when no ref is given. */
+  id: string
+  label?: string
+  /** API root including its version prefix, e.g. `https://host/v1`. */
+  baseUrl: string
+  /** Model id sent with each job. */
+  model: string
+  /** Credential reference the bearer token resolves through. */
+  apiKeyRef?: string
+  /** Per-endpoint overrides of the global defaults. */
+  seconds?: number
+  size?: string
+  fps?: number
+  orientation?: Orientation
+  enhance?: boolean
+}
+
 export interface Config {
-  provider?: VideoProvider
-  /** Video API root, including the `/v1` prefix. */
+  /**
+   * Deprecated: kept so an existing `cordis.patch.yml` row still validates.
+   * The endpoint shape is always the OpenAI-style video API.
+   */
+  provider?: string
+  /** Endpoints the user configured in Settings. Empty out of the box. */
+  connections?: VideoConnection[]
+  /** Id of the connection tool calls use; empty means the first one. */
+  activeConnection?: string
+  /**
+   * Single-endpoint fallback for a config-only setup, used when `connections`
+   * is empty. Blank means no endpoint at all, which is the shipped state:
+   * nothing here names a vendor.
+   */
   baseUrl?: string
-  /** Video model id served by that root; `ltx-2.5` is the current one. */
   model?: string
-  /** Credential reference the bearer token is resolved through. */
+  /** Credential reference for the fallback endpoint. */
   apiKeyRef?: string
   defaultSeconds?: number
   /** Tier name (`480p`/`720p`/`1080p`) or exact `WxH`. */
@@ -74,15 +102,33 @@ export interface Config {
   resumeJobs?: boolean
   /** Finished job records kept in the on-disk history. */
   jobHistory?: number
-  /** `generic` claims the generate_video verb family; `ninfer` keeps both video plugins usable. */
+  /** `generic` claims the verb family; `ninfer` prefixes every tool name. */
   toolNameSet?: ToolNameSet
 }
 
+// The schema of one endpoint row. Its fields are deliberately NOT volatile:
+// schemastery allows volatile only on a fixed object path, so the enclosing
+// `connections` array carries the live box and every row travels with it.
+const CONNECTION_SCHEMA = z.object({
+  id: z.string().default(''),
+  label: z.string().default(''),
+  baseUrl: z.string().default(''),
+  model: z.string().default(''),
+  apiKeyRef: z.string().default(''),
+  seconds: z.number().min(1).max(MAX_SECONDS),
+  size: z.string().default(''),
+  fps: z.number().min(MIN_FPS).max(MAX_FPS),
+  orientation: z.union(ORIENTATIONS),
+  enhance: z.boolean(),
+})
+
 export const Config = z.object({
-  provider: volatile(z.union(VIDEO_PROVIDERS).default('ninfer')),
-  baseUrl: volatile(z.string().default(DEFAULT_NINFER_BASE_URL)),
-  model: volatile(z.string().default(DEFAULT_NINFER_MODEL)),
-  apiKeyRef: volatile(z.string().default(NINFER_API_KEY_ENV)),
+  provider: volatile(z.string().default('custom')),
+  connections: volatile(z.array(CONNECTION_SCHEMA).default([])),
+  activeConnection: volatile(z.string().default('')),
+  baseUrl: volatile(z.string().default('')),
+  model: volatile(z.string().default('')),
+  apiKeyRef: volatile(z.string().default('')),
   defaultSeconds: volatile(z.number().min(1).max(MAX_SECONDS).default(DEFAULT_SECONDS)),
   defaultSize: volatile(z.string().default(DEFAULT_SIZE)),
   defaultOrientation: volatile(z.union(ORIENTATIONS)),
@@ -102,9 +148,10 @@ export const Config = z.object({
   toolNameSet: volatile(z.union(TOOL_NAME_SET_VALUES).default('generic')),
 }) as unknown as z<Config>
 
-/** Fully resolved video backend profile for one tool call. */
+/** One configured endpoint with its defaults already merged. */
 export interface VideoTarget {
-  provider: VideoProvider
+  connectionId: string
+  label: string
   baseURL: string
   model: string
   keyRef: string
@@ -121,34 +168,91 @@ export interface VideoTarget {
   saveThumbnail: boolean
 }
 
-/** Resolve the configured backend, refusing an empty endpoint with a fix hint. */
-export function resolveVideoTarget(config: Config): VideoTarget {
-  const baseURL = (config.baseUrl ?? DEFAULT_NINFER_BASE_URL).trim().replace(/\/+$/, '')
-  if (baseURL.length === 0) {
-    throw new Error('Ninfer video provider requires an API base URL; set it in Settings > Plugins > Video generation.')
+/** Settings-page guidance shared by every "nothing configured" error. */
+export const NO_ENDPOINT_HINT = 'Add one in Settings > Plugins > Video generation: base URL, API key, and model. The endpoint must speak the OpenAI-style video API (POST /videos).'
+
+/** Keep only usable connections and trim their fields. */
+export function usableConnections(config: Config): VideoConnection[] {
+  const rows: VideoConnection[] = []
+  for (const raw of config.connections ?? []) {
+    const baseUrl = (raw.baseUrl ?? '').trim()
+    if (baseUrl.length === 0) continue
+    const id = (raw.id ?? '').trim() || baseUrl
+    rows.push({
+      id,
+      ...((raw.label ?? '').trim() === '' ? {} : { label: (raw.label ?? '').trim() }),
+      baseUrl,
+      model: (raw.model ?? '').trim(),
+      ...((raw.apiKeyRef ?? '').trim() === '' ? {} : { apiKeyRef: (raw.apiKeyRef ?? '').trim() }),
+      ...(raw.seconds === undefined ? {} : { seconds: raw.seconds }),
+      ...((raw.size ?? '').trim() === '' ? {} : { size: (raw.size ?? '').trim() }),
+      ...(raw.fps === undefined ? {} : { fps: raw.fps }),
+      ...(raw.orientation === undefined ? {} : { orientation: raw.orientation }),
+      ...(raw.enhance === undefined ? {} : { enhance: raw.enhance }),
+    })
   }
+  // The config-only fallback still works for a hand-written cordis.patch.yml.
+  const legacyUrl = (config.baseUrl ?? '').trim()
+  if (rows.length === 0 && legacyUrl.length > 0) {
+    rows.push({
+      id: 'default',
+      label: 'Configured endpoint',
+      baseUrl: legacyUrl,
+      model: (config.model ?? '').trim(),
+      ...((config.apiKeyRef ?? '').trim() === '' ? {} : { apiKeyRef: (config.apiKeyRef ?? '').trim() }),
+    })
+  }
+  return rows
+}
+
+/** Normalize and validate one API root. */
+export function normalizeBaseUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, '')
   try {
-    const parsed = new URL(baseURL)
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      throw new Error(`unsupported protocol ${parsed.protocol}`)
-    }
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error(`unsupported protocol ${parsed.protocol}`)
   } catch {
-    throw new Error(`Ninfer video base URL "${config.baseUrl ?? ''}" is not a valid http(s) URL; set it in Settings > Plugins > Video generation.`)
+    throw new Error(`the video API base URL "${raw}" is not a valid http(s) URL; include the version prefix, for example https://host/v1.`)
   }
-  const model = (config.model ?? DEFAULT_NINFER_MODEL).trim()
+  return trimmed
+}
+
+/** Credential reference that belongs to one connection. */
+export function connectionKeyRef(connection: Pick<VideoConnection, 'id' | 'apiKeyRef'>): string {
+  const explicit = (connection.apiKeyRef ?? '').trim()
+  return explicit.length > 0 ? explicit : `VIDEO_GEN_KEY_${defaultKeyRef(connection.id)}`
+}
+
+/**
+ * Resolve the endpoint a tool call should use.
+ *
+ * Throws with settings guidance when nothing is configured: the plugin ships
+ * without a vendor, so the first thing a new user sees must be the fix, not a
+ * request to a host they never chose.
+ */
+export function resolveVideoTarget(config: Config, connectionId?: string, modelOverride?: string): VideoTarget {
+  const rows = usableConnections(config)
+  if (rows.length === 0) throw new Error(`No video endpoint is configured. ${NO_ENDPOINT_HINT}`)
+  const wanted = (connectionId ?? config.activeConnection ?? '').trim()
+  const picked = (wanted.length === 0 ? rows[0] : rows.find(row => row.id === wanted) ?? rows[0])
+  if (picked === undefined) throw new Error(`No video endpoint is configured. ${NO_ENDPOINT_HINT}`)
+  const baseURL = normalizeBaseUrl(picked.baseUrl)
+  const model = (modelOverride ?? picked.model ?? '').trim()
   if (model.length === 0) {
-    throw new Error('Ninfer video provider requires a model id (GET /v1/models lists what the server serves); set it in Settings > Plugins > Video generation.')
+    throw new Error(`The video endpoint "${picked.label ?? picked.id}" has no model id. Fetch the model list on that settings row, or type the model name.`)
   }
+  const orientation = picked.orientation ?? config.defaultOrientation
   return {
-    provider: config.provider ?? 'ninfer',
+    connectionId: picked.id,
+    label: picked.label ?? picked.id,
     baseURL,
     model,
-    keyRef: (config.apiKeyRef ?? NINFER_API_KEY_ENV).trim() || NINFER_API_KEY_ENV,
-    defaultSeconds: config.defaultSeconds ?? DEFAULT_SECONDS,
-    defaultSize: (config.defaultSize ?? DEFAULT_SIZE).trim() || DEFAULT_SIZE,
-    defaultFps: config.defaultFps ?? DEFAULT_FPS,
-    ...(config.defaultOrientation === undefined ? {} : { defaultOrientation: config.defaultOrientation }),
-    defaultEnhance: config.defaultEnhance ?? false,
+    keyRef: connectionKeyRef(picked),
+    defaultSeconds: picked.seconds ?? config.defaultSeconds ?? DEFAULT_SECONDS,
+    defaultSize: (picked.size ?? '').trim() || (config.defaultSize ?? DEFAULT_SIZE).trim() || DEFAULT_SIZE,
+    defaultFps: picked.fps ?? config.defaultFps ?? DEFAULT_FPS,
+    ...(orientation === undefined ? {} : { defaultOrientation: orientation }),
+    defaultEnhance: picked.enhance ?? config.defaultEnhance ?? false,
     ...(typeof config.negativePrompt === 'string' && config.negativePrompt.trim().length > 0
       ? { negativePrompt: config.negativePrompt.trim() }
       : {}),
@@ -162,14 +266,7 @@ export function resolveVideoTarget(config: Config): VideoTarget {
 
 /** Tool names this build registers. */
 export function toolNames(config: Config): { generate: string; status: string; cancel: string } {
-  const set = config.toolNameSet === 'ninfer' ? 'ninfer' : 'generic'
-  return set === 'ninfer'
+  return config.toolNameSet === 'ninfer'
     ? { generate: 'ninfer_generate_video', status: 'ninfer_check_video', cancel: 'ninfer_cancel_video' }
     : { generate: 'generate_video', status: 'check_video', cancel: 'cancel_video' }
-}
-
-/** Apply a per-call model override on top of the saved config. */
-export function withVideoModelOverride(config: Config, model?: string): Config {
-  const trimmed = model?.trim() ?? ''
-  return trimmed.length === 0 ? config : { ...config, model: trimmed }
 }

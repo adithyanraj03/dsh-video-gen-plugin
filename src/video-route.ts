@@ -62,7 +62,7 @@ export function sameOrigin(req: IncomingMessage): boolean {
 }
 
 /** Read a small JSON body; undefined when the body is absent or not an object. */
-async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown> | undefined> {
+export async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown> | undefined> {
   if (req.method === 'GET' || req.method === 'HEAD') return undefined
   const chunks: Buffer[] = []
   let total = 0

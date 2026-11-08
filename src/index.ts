@@ -1,23 +1,26 @@
-/** Ninfer LTX-2.5 video-generation bundle for DeepSeek Harness. */
+/** Video-generation bundle for DeepSeek Harness, over any OpenAI-style async video API. */
 import { join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import type { SettingsForms } from '@deepseek-ai/dsh-settings'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { Config, resolveVideoTarget, toolNames, withVideoModelOverride } from './config.js'
-import { requireApiKey } from './credentials.js'
+import { Config, resolveVideoTarget, toolNames } from './config.js'
+import { requireApiKey, resolveApiKey } from './credentials.js'
 import { VideoJobStore, toJobView, type SubmitRequest } from './jobs.js'
 import { createClient, getModels, getVideo, type NinferError } from './ninfer.js'
 import { resolveReference } from './reference-image.js'
 import { describeSettingsHealth, serveSettingsHealth } from './settings-health.js'
+import { credentialPorts, serveCredential, serveModels } from './settings-route.js'
 import {
   CANCEL_ROUTE,
+  CREDENTIAL_ROUTE,
   DEFAULT_JOB_TIMEOUT_MS,
   DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_WORKSPACE_FOLDER,
   ENHANCE_MODES,
   JOBS_ROUTE,
+  MODELS_ROUTE,
   ORIENTATIONS,
   SETTINGS_HEALTH_ROUTE,
   TEST_CONNECTION_ROUTE,
@@ -41,7 +44,7 @@ import { withWebAdmission, type WebAdmission } from './web-route.js'
 import { dshHome, getDshWorkspaceRoots, saveVideoToWorkspace, selectWorkspaceRoot } from './workspace-save.js'
 
 export { Config } from './config.js'
-export { VIDEO_ROUTE, THUMB_ROUTE, JOBS_ROUTE, CANCEL_ROUTE, TEST_CONNECTION_ROUTE, SETTINGS_HEALTH_ROUTE } from './shared.js'
+export { VIDEO_ROUTE, THUMB_ROUTE, JOBS_ROUTE, CANCEL_ROUTE, MODELS_ROUTE, CREDENTIAL_ROUTE, TEST_CONNECTION_ROUTE, SETTINGS_HEALTH_ROUTE } from './shared.js'
 
 export const name = 'dsh-video-gen'
 export const inject = ['tools', 'attachments', 'credentials']
@@ -214,9 +217,9 @@ export function apply(ctx: Context, config: Config = {}): void {
     knownWorkspaceRoots.add(resolved)
   }
 
-  /** Build a client for the configured backend, resolving the token on the spot. */
-  const makeClient = async (tool?: string) => {
-    const target = resolveVideoTarget(current())
+  /** Build a client for the active endpoint, resolving its token on the spot. */
+  const makeClient = async (tool?: string, modelOverride?: string) => {
+    const target = resolveVideoTarget(current(), undefined, modelOverride)
     const token = await requireApiKey(ctx, tool, target.keyRef)
     return { client: createClient({ baseURL: target.baseURL, token }), target }
   }
@@ -314,9 +317,8 @@ export function apply(ctx: Context, config: Config = {}): void {
       if (prompt.length === 0) throw new Error('video generation needs a non-empty prompt; describe the shot, the motion, and the sound.')
       noteSession(exec)
       const config = current()
-      const { target } = await makeClient(names.generate)
-      const requestConfig = withVideoModelOverride(config, input.model)
-      const model = resolveVideoTarget(requestConfig).model
+      const { target } = await makeClient(names.generate, input.model)
+      const model = target.model
       const enhance = input.enhance === 'on' ? true : input.enhance === 'off' ? false : target.defaultEnhance
       const orientation: Orientation | undefined = input.orientation ?? target.defaultOrientation
       const reference = await resolveReference({
@@ -507,6 +509,16 @@ export function apply(ctx: Context, config: Config = {}): void {
       path: CANCEL_ROUTE,
       handler: (req, res) => void serveCancel(req, res, { cancel: id => store.cancel(id) }),
     }), 'dsh-video-gen: cancel route')
+    webCtx.effect(() => register({
+      kind: 'exact',
+      path: MODELS_ROUTE,
+      handler: (req, res) => void serveModels(req, res, { resolveKey: ref => resolveApiKey(ctx, ref) }),
+    }), 'dsh-video-gen: model probe route')
+    webCtx.effect(() => register({
+      kind: 'exact',
+      path: CREDENTIAL_ROUTE,
+      handler: (req, res) => void serveCredential(req, res, credentialPorts(ctx)),
+    }), 'dsh-video-gen: credential route')
     webCtx.effect(() => register({
       kind: 'exact',
       path: TEST_CONNECTION_ROUTE,
