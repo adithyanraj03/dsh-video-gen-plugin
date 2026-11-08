@@ -1,0 +1,12 @@
+node_modules/
+lib/
+*.tgz
+.DS_Store
+*.log
+.smoke-home/
+
+# Rendered icon source; assets/icon.png is the committed deliverable.
+assets/icon-source.png
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
