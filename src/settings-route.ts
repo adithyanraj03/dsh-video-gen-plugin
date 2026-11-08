@@ -10,7 +10,7 @@ import { credentialRef, isCredentialRefName } from '@deepseek-ai/dsh-credentials
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { normalizeBaseUrl } from './config.js'
 import { KEY_SETTINGS_HINT } from './credentials.js'
-import { NinferError, createClient, getModels } from './ninfer.js'
+import { VideoApiError, createClient, getModels } from './video-api.js'
 import { jsonError, readJsonBody, sameOrigin, queryOf } from './video-route.js'
 
 /** Largest token a settings form may submit. */
@@ -84,11 +84,11 @@ export async function serveModels(req: IncomingMessage, res: ServerResponse, opt
     const models = await getModels(client)
     respond(res, 200, { ok: true, baseUrl: baseURL, models })
   } catch (error) {
-    const ninfer = error instanceof NinferError ? error : undefined
+    const failure = error instanceof VideoApiError ? error : undefined
     respond(res, 200, {
       ok: false,
-      code: ninfer?.code ?? 'probe_failed',
-      status: ninfer?.status ?? 0,
+      code: failure?.code ?? 'probe_failed',
+      status: failure?.status ?? 0,
       message: error instanceof Error ? error.message : String(error),
     })
   }

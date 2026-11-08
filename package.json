@@ -1,7 +1,7 @@
 {
   "name": "dsh-video-gen",
   "version": "0.1.0",
-  "description": "Ninfer LTX-2.5 video generation for DeepSeek Harness — text-to-video and image-to-video with inline playback, live progress, and cancel.",
+  "description": "Bring-your-own video endpoint for DeepSeek Harness: text-to-video and image-to-video with inline playback, live progress, and cancel.",
   "type": "module",
   "author": "Adithya N Raj",
   "contributors": [
@@ -72,8 +72,7 @@
     "ai-video-generation",
     "text-to-video",
     "image-to-video",
-    "ltx-video",
-    "ninfer",
+    "openai-compatible",
     "byok",
     "cordis"
   ],

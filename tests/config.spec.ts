@@ -154,9 +154,8 @@ describe('tool names', () => {
     expect(toolNames(resolved({}))).toEqual({ generate: 'generate_video', status: 'check_video', cancel: 'cancel_video' })
   })
 
-  it('falls back to the ninfer family when asked', () => {
-    expect(toolNames(resolved({ toolNameSet: 'ninfer' }))).toEqual({
-      generate: 'ninfer_generate_video', status: 'ninfer_check_video', cancel: 'ninfer_cancel_video',
-    })
+  it('namespaces the tool names when asked', () => {
+    const prefixed = { generate: 'videogen_generate_video', status: 'videogen_check_video', cancel: 'videogen_cancel_video' }
+    expect(toolNames(resolved({ toolNameSet: 'prefixed' }))).toEqual(prefixed)
   })
 })

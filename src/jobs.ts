@@ -21,10 +21,12 @@ import {
   type VideoJobRecord,
   type VideoJobView,
 } from './shared.js'
-import { cancelVideo, createVideo, describeJobFailure, downloadContent, getVideo, pollDelay, type NinferClient, type NinferJob, type ReferenceImage } from './ninfer.js'
+import { cancelVideo, createVideo, describeJobFailure, downloadContent, getVideo, pollDelay, type ReferenceImage, type RemoteVideoJob, type VideoApiClient } from './video-api.js'
 
 /** Everything needed to queue one clip. */
 export interface SubmitRequest {
+  /** Endpoint id, kept on the record so history survives endpoint changes. */
+  endpointId?: string
   model: string
   prompt: string
   seconds: number
@@ -40,7 +42,7 @@ export interface JobStoreOptions {
   /** Directory that receives finished clips and `jobs.json`; re-read every use. */
   dir: string | (() => string)
   /** Client factory so a rotated token takes effect without a restart. */
-  client: () => NinferClient | Promise<NinferClient>
+  client: () => VideoApiClient | Promise<VideoApiClient>
   log?: (message: string) => void
   pollIntervalMs?: number
   jobTimeoutMs?: number
@@ -92,7 +94,7 @@ export function mapStatus(status: string): JobStatus {
 }
 
 /** Merge one server payload into a local record. */
-export function applyJobPayload(record: VideoJobRecord, job: NinferJob, now: number): VideoJobRecord {
+export function applyJobPayload(record: VideoJobRecord, job: RemoteVideoJob, now: number): VideoJobRecord {
   const status = mapStatus(job.status)
   const next: VideoJobRecord = {
     ...record,
@@ -195,8 +197,8 @@ export class VideoJobStore {
           : 'interrupted'
         this.records.set(record.id, {
           id: record.id,
-          provider: record.provider ?? 'ninfer',
-          model: record.model ?? 'ltx-2.5',
+          provider: record.provider ?? 'video',
+          model: record.model ?? '',
           prompt: record.prompt ?? '',
           status,
           progress: typeof record.progress === 'number' ? record.progress : 0,
@@ -284,7 +286,7 @@ export class VideoJobStore {
     const now = this.now()
     const record: VideoJobRecord = {
       id: job.id,
-      provider: 'ninfer',
+      provider: request.endpointId ?? 'video',
       model: job.model ?? request.model,
       prompt: request.prompt,
       status: mapStatus(job.status),
@@ -375,7 +377,7 @@ export class VideoJobStore {
   }
 
   /** Download the MP4 (and thumbnail) and record where they landed. */
-  private async finalize(id: string, client: NinferClient): Promise<VideoJobRecord> {
+  private async finalize(id: string, client: VideoApiClient): Promise<VideoJobRecord> {
     const record = this.records.get(id) as VideoJobRecord
     const paths = this.filePaths(record)
     await mkdir(this.dir, { recursive: true })

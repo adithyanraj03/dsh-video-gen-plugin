@@ -52,7 +52,7 @@ export interface VideoSettings {
   saveToWorkspace?: boolean | undefined
   workspaceFolder?: string | undefined
   saveThumbnail?: boolean | undefined
-  toolNameSet?: 'generic' | 'ninfer' | undefined
+  toolNameSet?: 'generic' | 'prefixed' | undefined
 }
 
 export interface SettingsScopeSnapshot<T> {
@@ -268,7 +268,7 @@ export function VideoSettingsCard(props: SettingsCardProps) {
       await writeSetting(scope, 'saveThumbnail', draft.saveThumbnail !== false)
       await writeSetting(scope, 'workspaceFolder', (draft.workspaceFolder ?? 'videos').trim())
       await writeSetting(scope, 'negativePrompt', (draft.negativePrompt ?? '').trim())
-      await writeSetting(scope, 'toolNameSet', draft.toolNameSet === 'ninfer' ? 'ninfer' : 'generic')
+      await writeSetting(scope, 'toolNameSet', draft.toolNameSet === 'generic' ? 'generic' : 'prefixed')
       lastStored.current = JSON.stringify(normalizeDraft({ ...draft, connections: clean }))
       setMessage({ tone: 'ok', text: 'Settings saved. Tool calls use the selected endpoint from the next turn.' })
     } catch (error) {
@@ -374,7 +374,7 @@ export function VideoSettingsCard(props: SettingsCardProps) {
                   style={{ ...STYLE.input, ...STYLE.monospace }}
                   value={row.model ?? ''}
                   list={`video-models-${row.id}`}
-                  placeholder="model id, e.g. ltx-2.5"
+                  placeholder="model id from your endpoint"
                   onChange={event => setRow(index, { model: event.target.value })}
                 />
                 <datalist id={`video-models-${row.id}`}>
@@ -525,10 +525,10 @@ export function VideoSettingsCard(props: SettingsCardProps) {
             <select
               style={STYLE.input}
               value={draft.toolNameSet ?? 'generic'}
-              onChange={event => setDraft(current => ({ ...current, toolNameSet: event.target.value === 'ninfer' ? 'ninfer' : 'generic' }))}
+              onChange={event => setDraft(current => ({ ...current, toolNameSet: event.target.value === 'generic' ? 'generic' : 'prefixed' }))}
             >
               <option value="generic">generic (generate_video)</option>
-              <option value="ninfer">prefixed (ninfer_generate_video)</option>
+              <option value="prefixed">prefixed (videogen_generate_video)</option>
             </select>
           </label>
         </div>
@@ -559,7 +559,7 @@ export function VideoSettingsCard(props: SettingsCardProps) {
           </label>
         </div>
         <p style={STYLE.muted}>
-          Tool names change after a host restart. A <code>ninfer</code> prefix is the escape hatch when
+          Tool names change after a host restart. A <code>videogen</code> prefix is the escape hatch when
           another plugin already owns <code>generate_video</code>.
         </p>
       </div>
@@ -611,7 +611,7 @@ export function normalizeDraft(value: VideoSettings | undefined): VideoSettings 
     saveToWorkspace: value?.saveToWorkspace !== false,
     saveThumbnail: value?.saveThumbnail !== false,
     workspaceFolder: textOf(value?.workspaceFolder) || 'videos',
-    toolNameSet: value?.toolNameSet === 'ninfer' ? 'ninfer' : 'generic',
+    toolNameSet: value?.toolNameSet === 'generic' ? 'generic' : value?.toolNameSet === undefined ? 'generic' : 'prefixed',
   }
 }
 

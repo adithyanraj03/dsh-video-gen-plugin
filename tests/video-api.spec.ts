@@ -11,8 +11,8 @@ import {
   parseJob,
   pollDelay,
   referenceDataUrl,
-  toNinferError,
-} from '../src/ninfer.js'
+  toVideoApiError,
+} from '../src/video-api.js'
 
 const reference = {
   data: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
@@ -42,7 +42,7 @@ describe('buildCreateBody', () => {
   })
 
   it('refuses a prompt beyond the server limit', () => {
-    expect(() => buildCreateBody({ model: 'ltx-2.5', prompt: 'x'.repeat(8001) })).toThrow(/at most 8000/)
+    expect(() => buildCreateBody({ model: 'ltx-2.5', prompt: 'x'.repeat(8001) })).toThrow(/documented limit is 8000/)
   })
 
   it('refuses seconds and fps outside the documented windows', () => {
@@ -75,11 +75,11 @@ describe('mapFailure', () => {
 
   it('maps bad requests and unknown models', () => {
     expect(mapFailure(400, '', 'invalid size', 'POST /videos').message).toMatch(/invalid size/)
-    expect(mapFailure(404, 'model_not_found', '', 'POST /videos').message).toMatch(/GET \/v1\/models/)
+    expect(mapFailure(404, 'model_not_found', '', 'POST /videos').message).toMatch(/Fetch the model list/)
   })
 
   it('tells the reader a 404 job id means a restarted server', () => {
-    expect(mapFailure(404, '', '', 'GET /videos/x').message).toMatch(/forgets jobs on restart/)
+    expect(mapFailure(404, '', '', 'GET /videos/x').message).toMatch(/forget jobs on restart/)
   })
 
   it('treats 409 as retryable and 413 as a picture-size problem', () => {
@@ -88,7 +88,7 @@ describe('mapFailure', () => {
   })
 
   it('maps unavailable engines and 5xx as retryable', () => {
-    expect(mapFailure(503, 'engine_missing', '', 'POST /videos').message).toMatch(/engine is unavailable/)
+    expect(mapFailure(503, 'engine_missing', '', 'POST /videos').message).toMatch(/engine behind this endpoint is unavailable/)
     expect(mapFailure(500, '', 'boom', 'POST /videos').retryable).toBe(true)
   })
 })
@@ -151,11 +151,11 @@ function fakeFetch(handler: (url: string, init?: RequestInit) => Response): { ca
 describe('createVideo', () => {
   it('posts JSON when there is no start frame', async () => {
     const fake = fakeFetch(() => new Response(JSON.stringify({ id: 'video_a', status: 'queued' }), { status: 200 }))
-    const client = createClient({ baseURL: 'https://ninfer.test/v1', token: 't', fetchFn: fake.fetchFn })
+    const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
     const job = await createVideo(client, { model: 'ltx-2.5', prompt: 'p', seconds: 5 })
     expect(job.id).toBe('video_a')
     const call = fake.calls[0]!
-    expect(call.url).toBe('https://ninfer.test/v1/videos')
+    expect(call.url).toBe('https://video.test/v1/videos')
     expect(call.init?.method).toBe('POST')
     expect((call.init?.headers as Record<string, string>)['content-type']).toBe('application/json')
     expect((call.init?.headers as Record<string, string>).authorization).toBe('Bearer t')
@@ -163,7 +163,7 @@ describe('createVideo', () => {
 
   it('posts multipart when a first frame is supplied', async () => {
     const fake = fakeFetch(() => new Response(JSON.stringify({ id: 'video_b', status: 'queued', from_picture: true }), { status: 200 }))
-    const client = createClient({ baseURL: 'https://ninfer.test/v1', token: 't', fetchFn: fake.fetchFn })
+    const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
     const job = await createVideo(client, { model: 'ltx-2.5', prompt: 'p', seconds: 5 }, { reference })
     expect(job.fromPicture).toBe(true)
     const call = fake.calls[0]!
@@ -171,9 +171,9 @@ describe('createVideo', () => {
     expect((call.init?.headers as Record<string, string>)['content-type']).toBeUndefined()
   })
 
-  it('turns an HTTP failure into a NinferError with the fix attached', async () => {
+  it('turns an HTTP failure into a VideoApiError with the fix attached', async () => {
     const fake = fakeFetch(() => new Response(JSON.stringify({ error: { code: 'model_not_found', message: 'no such model' } }), { status: 404 }))
-    const client = createClient({ baseURL: 'https://ninfer.test/v1', token: 't', fetchFn: fake.fetchFn })
+    const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
     await expect(createVideo(client, { model: 'nope', prompt: 'p' })).rejects.toMatchObject({ code: 'model_not_found', retryable: false })
   })
 })
@@ -181,34 +181,34 @@ describe('createVideo', () => {
 describe('downloadContent', () => {
   it('returns the bytes of a finished clip', async () => {
     const fake = fakeFetch(() => new Response(new Uint8Array([1, 2, 3, 4]), { status: 200, headers: { 'content-length': '4' } }))
-    const client = createClient({ baseURL: 'https://ninfer.test/v1', token: 't', fetchFn: fake.fetchFn })
+    const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
     const bytes = await downloadContent(client, 'video_a', { maxBytes: 1024 })
     expect([...bytes]).toEqual([1, 2, 3, 4])
-    expect(fake.calls[0]!.url).toBe('https://ninfer.test/v1/videos/video_a/content')
+    expect(fake.calls[0]!.url).toBe('https://video.test/v1/videos/video_a/content')
   })
 
   it('asks for the thumbnail variant', async () => {
     const fake = fakeFetch(() => new Response(new Uint8Array([9]), { status: 200 }))
-    const client = createClient({ baseURL: 'https://ninfer.test/v1', token: 't', fetchFn: fake.fetchFn })
+    const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
     await downloadContent(client, 'video_a', { kind: 'thumbnail', maxBytes: 1024 })
-    expect(fake.calls[0]!.url).toBe('https://ninfer.test/v1/videos/video_a/content?variant=thumbnail')
+    expect(fake.calls[0]!.url).toBe('https://video.test/v1/videos/video_a/content?variant=thumbnail')
   })
 
   it('refuses a clip over the configured byte budget', async () => {
     const fake = fakeFetch(() => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-length': '5000000' } }))
-    const client = createClient({ baseURL: 'https://ninfer.test/v1', token: 't', fetchFn: fake.fetchFn })
+    const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
     await expect(downloadContent(client, 'video_a', { maxBytes: 1000 })).rejects.toMatchObject({ code: 'too_large' })
   })
 
   it('reports a not-ready clip as retryable', async () => {
     const fake = fakeFetch(() => new Response(JSON.stringify({ error: { message: 'not ready' } }), { status: 409 }))
-    const client = createClient({ baseURL: 'https://ninfer.test/v1', token: 't', fetchFn: fake.fetchFn })
+    const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
     await expect(downloadContent(client, 'video_a', { maxBytes: 1000 })).rejects.toMatchObject({ retryable: true })
   })
 
   it('reports an unreachable host as a retryable network failure', async () => {
     const client = createClient({
-      baseURL: 'https://ninfer.test/v1',
+      baseURL: 'https://video.test/v1',
       token: 't',
       fetchFn: async () => { throw new Error('getaddrinfo ENOTFOUND') },
     })
@@ -217,9 +217,9 @@ describe('downloadContent', () => {
 
   it('turns a non-JSON body into a typed error', async () => {
     const fake = fakeFetch(() => new Response('<html>oops</html>', { status: 200 }))
-    const client = createClient({ baseURL: 'https://ninfer.test/v1', token: 't', fetchFn: fake.fetchFn })
+    const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
     const response = new Response('<html>', { status: 200 })
-    await expect(toNinferError(response, 'GET /x')).resolves.toMatchObject({ retryable: false })
+    await expect(toVideoApiError(response, 'GET /x')).resolves.toMatchObject({ retryable: false })
     void fake
     void client
   })

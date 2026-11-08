@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { VideoJobStore, applyJobPayload, mapStatus, toJobView } from '../src/jobs.js'
-import type { NinferClient } from '../src/ninfer.js'
+import type { VideoApiClient } from '../src/video-api.js'
 import type { VideoJobRecord } from '../src/shared.js'
 
 const record = (overrides: Partial<VideoJobRecord> = {}): VideoJobRecord => ({
@@ -13,9 +13,9 @@ const record = (overrides: Partial<VideoJobRecord> = {}): VideoJobRecord => ({
 })
 
 /** Canned server: one create call, then the polled states, then the MP4. */
-function fakeClient(states: string[], clip = new Uint8Array([1, 2, 3, 4])): { client: NinferClient; polls: () => number } {
+function fakeClient(states: string[], clip = new Uint8Array([1, 2, 3, 4])): { client: VideoApiClient; polls: () => number } {
   let polls = 0
-  const client: NinferClient = {
+  const client: VideoApiClient = {
     baseURL: 'https://ninfer.test/v1',
     token: 't',
     fetchFn: async (url) => {

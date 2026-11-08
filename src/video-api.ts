@@ -1,11 +1,11 @@
 /**
- * Ninfer LTX-2.5 video API client.
+ * Client for the OpenAI-style asynchronous video API.
  *
- * The service is OpenAI-Sora shaped: `POST /v1/videos` queues a job,
- * `GET /v1/videos/{id}` is polled until the status leaves `queued`/`in_progress`,
- * and `GET /v1/videos/{id}/content` streams the finished MP4. A start-frame
- * picture travels as the multipart `input_reference` field (or a data URL in
- * JSON mode) and becomes the clip's first frame.
+ * The shape is what this plugin renders, not a vendor: `POST /videos` queues a
+ * job, `GET /videos/{id}` is polled until the status leaves `queued`/
+ * `in_progress`, and `GET /videos/{id}/content` streams the finished MP4. A
+ * start-frame picture travels as the multipart `input_reference` field (or a
+ * data URL in JSON mode) and becomes the clip's first frame.
  */
 import {
   DEFAULT_DOWNLOAD_TIMEOUT_MS,
@@ -24,7 +24,7 @@ import {
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 /** One video job as reported by the server, decoded defensively. */
-export interface NinferJob {
+export interface RemoteVideoJob {
   id: string
   status: string
   progress?: number
@@ -52,25 +52,34 @@ export interface ReferenceImage {
 }
 
 /** One API failure with the fix already spelled out for the reader. */
-export class NinferError extends Error {
+export class VideoApiError extends Error {
   constructor(message: string, readonly status: number, readonly code: string, readonly retryable: boolean) {
     super(message)
-    this.name = 'NinferError'
+    this.name = 'VideoApiError'
   }
 }
 
-export interface NinferClient {
+export interface VideoApiClient {
   baseURL: string
   token: string
   fetchFn: FetchLike
 }
 
+/** Host name of an endpoint, for messages that must name who refused. */
+export function endpointLabel(baseURL: string): string {
+  try {
+    return new URL(baseURL).host
+  } catch {
+    return baseURL
+  }
+}
+
 /** Build a client; the base URL must already be trimmed of trailing slashes. */
-export function createClient(options: { baseURL: string; token: string; fetchFn?: FetchLike }): NinferClient {
+export function createClient(options: { baseURL: string; token: string; fetchFn?: FetchLike }): VideoApiClient {
   const baseURL = options.baseURL.trim().replace(/\/+$/, '')
   const token = options.token.trim()
-  if (baseURL.length === 0) throw new NinferError('Ninfer client needs a base URL.', 0, 'invalid_base_url', false)
-  if (token.length === 0) throw new NinferError('Ninfer client needs a bearer token.', 401, 'no_token', false)
+  if (baseURL.length === 0) throw new VideoApiError('the video client needs a base URL.', 0, 'invalid_base_url', false)
+  if (token.length === 0) throw new VideoApiError('the video client needs a bearer token.', 401, 'no_token', false)
   return { baseURL, token, fetchFn: options.fetchFn ?? ((input, init) => fetch(input, init)) }
 }
 
@@ -99,7 +108,7 @@ function deadline(signal: AbortSignal | undefined, timeoutMs: number): { signal:
  * Explain one non-2xx response, mapping the documented codes to actions the
  * reader can take without reading this file.
  */
-export async function toNinferError(response: Response, context: string): Promise<NinferError> {
+export async function toVideoApiError(response: Response, context: string): Promise<VideoApiError> {
   let payload: unknown
   try {
     payload = await response.json()
@@ -111,37 +120,37 @@ export async function toNinferError(response: Response, context: string): Promis
   const serverCode = typeof errorRecord.code === 'string' ? errorRecord.code : ''
   const serverMessage = typeof errorRecord.message === 'string' ? errorRecord.message : ''
   const mapped = mapFailure(response.status, serverCode, serverMessage, context)
-  return new NinferError(mapped.message, response.status, serverCode.length > 0 ? serverCode : `http_${String(response.status)}`, mapped.retryable)
+  return new VideoApiError(mapped.message, response.status, serverCode.length > 0 ? serverCode : `http_${String(response.status)}`, mapped.retryable)
 }
 
 /** Pure status/code → message mapping; every branch is covered by tests. */
 export function mapFailure(status: number, code: string, message: string, context: string): { message: string; retryable: boolean } {
   const detail = message.length > 0 ? ` (${message})` : ''
   if (status === 401 || status === 403) {
-    return { message: `${context}: ${'the Ninfer server rejected the bearer token'}${detail}. Save the token for the configured credential in Settings > Plugins > Video generation.`, retryable: false }
+    return { message: `${context}: the endpoint rejected the bearer token${detail}. Save the token for the endpoint's credential in Settings > Plugins > Video generation.`, retryable: false }
   }
   if (status === 400) {
-    return { message: `${context}: Ninfer rejected the request${detail}. Check prompt, seconds (1-30), size, and fps (8-50).`, retryable: false }
+    return { message: `${context}: the endpoint rejected the request${detail}. Check prompt, seconds (1-30), size, and fps (8-50).`, retryable: false }
   }
   if (status === 404 && code === 'model_not_found') {
-    return { message: `${context}: Ninfer does not serve this model${detail}. GET /v1/models lists the ids the server has loaded; update the model in Settings > Plugins > Video generation.`, retryable: false }
+    return { message: `${context}: the endpoint does not serve this model${detail}. Fetch the model list on the settings row and pick one of its ids.`, retryable: false }
   }
   if (status === 404) {
-    return { message: `${context}: this job id is unknown to Ninfer${detail}. The server forgets jobs on restart, so submit the clip again.`, retryable: false }
+    return { message: `${context}: this job id is unknown to the endpoint${detail}. Servers forget jobs on restart, so submit the clip again.`, retryable: false }
   }
   if (status === 409) {
     return { message: `${context}: the clip is not ready to download yet${detail}. Poll the job until status is completed, then fetch /content again.`, retryable: true }
   }
   if (status === 413) {
-    return { message: `${context}: the start-frame picture is too large${detail}. Ninfer accepts one PNG/JPEG/WebP under 20 MB — downscale it or crop to the frame you want to animate.`, retryable: false }
+    return { message: `${context}: the start-frame picture is too large${detail}. This plugin sends one PNG/JPEG/WebP under 20 MB — downscale it or crop to the frame you want to animate.`, retryable: false }
   }
   if (status === 503) {
-    return { message: `${context}: the Ninfer video engine is unavailable${detail}. The operator must enable the LTX video engine (codes: disabled, engine_missing, models_missing).`, retryable: true }
+    return { message: `${context}: the video engine behind this endpoint is unavailable${detail}. The server operator must enable it (codes: disabled, engine_missing, models_missing).`, retryable: true }
   }
   if (status >= 500) {
-    return { message: `${context}: Ninfer returned HTTP ${String(status)}${detail}. The server may be loading the video engine; retry shortly.`, retryable: true }
+    return { message: `${context}: the endpoint returned HTTP ${String(status)}${detail}. The server may still be loading its video engine; retry shortly.`, retryable: true }
   }
-  return { message: `${context}: Ninfer returned HTTP ${String(status)}${detail}.`, retryable: false }
+  return { message: `${context}: the endpoint returned HTTP ${String(status)}${detail}.`, retryable: false }
 }
 
 /** Translate a failed job's `error.code` into an instruction the agent can act on. */
@@ -149,27 +158,27 @@ export function describeJobFailure(code: string | undefined, message: string | u
   const detail = message ?? 'no message from the server'
   switch (code) {
     case 'models_missing':
-      return `Ninfer has no video engine loaded (${detail}); ask the operator to load ltx-2.5, then retry.`
+      return `the endpoint has no video model loaded (${detail}); load one server-side, then retry.`
     case 'engine_refused':
-      return `Ninfer's engine refused the job (${detail}); retry with a shorter clip or a smaller size.`
+      return `the endpoint's engine refused the job (${detail}); retry with a shorter clip or a smaller size.`
     case 'engine_error':
-      return `Ninfer's engine failed while rendering (${detail}); simplify the prompt or lower the resolution and retry.`
+      return `the endpoint's engine failed while rendering (${detail}); simplify the prompt or lower the resolution and retry.`
     case 'timeout':
-      return `Ninfer timed out rendering this clip (${detail}); retry with fewer seconds or a lower size.`
+      return `the endpoint timed out rendering this clip (${detail}); retry with fewer seconds or a lower size.`
     case 'cancelled':
       return `the job was cancelled on the server${detail === undefined ? '' : ` (${detail})`}.`
     case 'no_video':
-      return `Ninfer produced no video frames for this prompt (${detail}); describe visible motion and sound, then retry.`
+      return `the endpoint produced no video frames for this prompt (${detail}); describe visible motion and sound, then retry.`
     case 'runner_failed':
-      return `Ninfer's render runner crashed (${detail}); retry once, then report it to the operator.`
+      return `the endpoint's render runner crashed (${detail}); retry once, then report it to the operator.`
     case 'internal':
-      return `Ninfer reported an internal error (${detail}); retry once.`
+      return `the endpoint reported an internal error (${detail}); retry once.`
     default:
-      return `Ninfer job failed${code === undefined ? '' : ` with code ${code}`}: ${detail}${job.seconds === undefined ? '' : ` (asked for ${String(job.seconds)}s`}${job.size === undefined ? '' : ` at ${job.size})`}.`
+      return `the job failed${code === undefined ? '' : ` with code ${code}`}: ${detail}${job.seconds === undefined ? '' : ` (asked for ${String(job.seconds)}s`}${job.size === undefined ? '' : ` at ${job.size})`}.`
   }
 }
 
-/** JSON body for `POST /v1/videos`; validation happens here, not on the wire. */
+/** JSON body for `POST /videos`; validation happens here, not on the wire. */
 export function buildCreateBody(request: {
   model: string
   prompt: string
@@ -185,7 +194,7 @@ export function buildCreateBody(request: {
   const prompt = request.prompt.trim()
   if (prompt.length === 0) throw new Error('video generation needs a non-empty prompt describing the motion and the sound.')
   if (prompt.length > MAX_PROMPT_CHARS) {
-    throw new Error(`video prompt is ${String(prompt.length)} characters; Ninfer accepts at most ${String(MAX_PROMPT_CHARS)} — shorten the shot description.`)
+    throw new Error(`video prompt is ${String(prompt.length)} characters; this endpoint's documented limit is ${String(MAX_PROMPT_CHARS)} — shorten the shot description.`)
   }
   const seconds = request.seconds ?? 5
   if (!Number.isFinite(seconds) || seconds < MIN_SECONDS || seconds > MAX_SECONDS) {
@@ -246,10 +255,10 @@ function decodeNumber(value: unknown): number | undefined {
 }
 
 /** Decode one job payload; a payload without an id is not a job. */
-export function parseJob(payload: unknown): NinferJob {
+export function parseJob(payload: unknown): RemoteVideoJob {
   const record = typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {}
   const id = typeof record.id === 'string' ? record.id : ''
-  if (id.length === 0) throw new NinferError('Ninfer replied without a job id.', 502, 'invalid_job', true)
+  if (id.length === 0) throw new VideoApiError('the endpoint replied without a job id.', 502, 'invalid_job', true)
   const errorRecord = typeof record.error === 'object' && record.error !== null ? record.error as Record<string, unknown> : undefined
   const timingRecord = typeof record.timing === 'object' && record.timing !== null ? record.timing as Record<string, unknown> : undefined
   const timing: Record<string, number> = {}
@@ -258,7 +267,7 @@ export function parseJob(payload: unknown): NinferJob {
     if (number !== undefined) timing[key] = number
   }
   const createdAt = decodeNumber(record.created_at)
-  const job: NinferJob = {
+  const job: RemoteVideoJob = {
     id,
     status: typeof record.status === 'string' ? record.status : 'queued',
     progress: decodeNumber(record.progress) ?? 0,
@@ -296,7 +305,7 @@ export function parseJob(payload: unknown): NinferJob {
 }
 
 /** Low-level JSON call: attaches the bearer token and maps every failure. */
-async function requestJson(client: NinferClient, method: string, path: string, options: {
+async function requestJson(client: VideoApiClient, method: string, path: string, options: {
   body?: unknown
   form?: FormData
   signal?: AbortSignal
@@ -317,26 +326,26 @@ async function requestJson(client: NinferClient, method: string, path: string, o
     response = await client.fetchFn(client.baseURL + path, init)
   } catch (error) {
     if (options.signal?.aborted === true) throw error
-    throw new NinferError(`${method} ${path} could not reach Ninfer: ${error instanceof Error ? error.message : String(error)}`, 0, 'network', true)
+    throw new VideoApiError(`${method} ${path} could not reach ${endpointLabel(client.baseURL)}: ${error instanceof Error ? error.message : String(error)}`, 0, 'network', true)
   } finally {
     timer.dispose()
   }
-  if (!response.ok) throw await toNinferError(response, `${method} ${path}`)
+  if (!response.ok) throw await toVideoApiError(response, `${method} ${path}`)
   const text = await response.text()
   if (text.length === 0) return {}
   try {
     return JSON.parse(text) as unknown
   } catch {
-    throw new NinferError(`${method} ${path} returned a body that is not JSON.`, 502, 'invalid_json', true)
+    throw new VideoApiError(`${method} ${path} returned a body that is not JSON.`, 502, 'invalid_json', true)
   }
 }
 
 /** Queue one clip. A start frame travels as multipart; otherwise the JSON body is used. */
-export async function createVideo(client: NinferClient, request: Parameters<typeof buildCreateBody>[0], options: {
+export async function createVideo(client: VideoApiClient, request: Parameters<typeof buildCreateBody>[0], options: {
   reference?: ReferenceImage
   signal?: AbortSignal
   FormDataImpl?: typeof FormData
-} = {}): Promise<NinferJob> {
+} = {}): Promise<RemoteVideoJob> {
   const body = buildCreateBody(options.reference === undefined
     ? request
     : { ...request, referenceDataUrl: referenceDataUrl(options.reference) })
@@ -351,12 +360,12 @@ export async function createVideo(client: NinferClient, request: Parameters<type
 }
 
 /** Read one job's current state. */
-export async function getVideo(client: NinferClient, id: string, signal?: AbortSignal): Promise<NinferJob> {
+export async function getVideo(client: VideoApiClient, id: string, signal?: AbortSignal): Promise<RemoteVideoJob> {
   return parseJob(await requestJson(client, 'GET', `/videos/${encodeURIComponent(id)}`, { ...(signal === undefined ? {} : { signal }) }))
 }
 
 /** Most recent jobs the server still knows about. */
-export async function listVideos(client: NinferClient, limit: number = 20, signal?: AbortSignal): Promise<NinferJob[]> {
+export async function listVideos(client: VideoApiClient, limit: number = 20, signal?: AbortSignal): Promise<RemoteVideoJob[]> {
   const payload = await requestJson(client, 'GET', `/videos?limit=${String(Math.max(1, Math.min(100, Math.round(limit))))}`, { ...(signal === undefined ? {} : { signal }) })
   const record = typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {}
   const data = Array.isArray(record.data) ? record.data : []
@@ -364,12 +373,12 @@ export async function listVideos(client: NinferClient, limit: number = 20, signa
 }
 
 /** Cancel a queued or running job; a finished one is a no-op upstream. */
-export async function cancelVideo(client: NinferClient, id: string, signal?: AbortSignal): Promise<void> {
+export async function cancelVideo(client: VideoApiClient, id: string, signal?: AbortSignal): Promise<void> {
   await requestJson(client, 'DELETE', `/videos/${encodeURIComponent(id)}`, { ...(signal === undefined ? {} : { signal }) })
 }
 
 /** Model ids the server reports, filtered to the video kind when it labels them. */
-export async function getModels(client: NinferClient, signal?: AbortSignal): Promise<string[]> {
+export async function getModels(client: VideoApiClient, signal?: AbortSignal): Promise<string[]> {
   const payload = await requestJson(client, 'GET', '/models', { ...(signal === undefined ? {} : { signal }) })
   const record = typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {}
   const data = Array.isArray(record.data) ? record.data : Array.isArray(payload) ? payload : []
@@ -386,7 +395,7 @@ export async function getModels(client: NinferClient, signal?: AbortSignal): Pro
 }
 
 /** Fetch one clip's bytes; `thumbnail` asks for the server's middle-frame JPEG. */
-export async function downloadContent(client: NinferClient, id: string, options: {
+export async function downloadContent(client: VideoApiClient, id: string, options: {
   kind?: 'video' | 'thumbnail'
   maxBytes: number
   signal?: AbortSignal
@@ -404,19 +413,19 @@ export async function downloadContent(client: NinferClient, id: string, options:
     })
   } catch (error) {
     if (options.signal?.aborted === true) throw error
-    throw new NinferError(`GET ${path} could not reach Ninfer: ${error instanceof Error ? error.message : String(error)}`, 0, 'network', true)
+    throw new VideoApiError(`GET ${path} could not reach ${endpointLabel(client.baseURL)}: ${error instanceof Error ? error.message : String(error)}`, 0, 'network', true)
   } finally {
     timer.dispose()
   }
-  if (!response.ok) throw await toNinferError(response, `GET ${path}`)
+  if (!response.ok) throw await toVideoApiError(response, `GET ${path}`)
   const declared = Number(response.headers.get('content-length') ?? '0')
   if (Number.isFinite(declared) && declared > options.maxBytes) {
-    throw new NinferError(`GET ${path}: the clip is ${String(Math.round(declared / 1_048_576))} MB, over the configured ${String(Math.round(options.maxBytes / 1_048_576))} MB limit. Lower size or seconds in Settings > Plugins > Video generation.`, 413, 'too_large', false)
+    throw new VideoApiError(`GET ${path}: the clip is ${String(Math.round(declared / 1_048_576))} MB, over the configured ${String(Math.round(options.maxBytes / 1_048_576))} MB limit. Lower size or seconds in Settings > Plugins > Video generation.`, 413, 'too_large', false)
   }
   const data = new Uint8Array(await response.arrayBuffer())
-  if (data.byteLength === 0) throw new NinferError(`GET ${path}: Ninfer returned an empty body.`, 502, 'empty_body', true)
+  if (data.byteLength === 0) throw new VideoApiError(`GET ${path}: the endpoint returned an empty body.`, 502, 'empty_body', true)
   if (data.byteLength > options.maxBytes) {
-    throw new NinferError(`GET ${path}: the clip is ${String(Math.round(data.byteLength / 1_048_576))} MB, over the configured ${String(Math.round(options.maxBytes / 1_048_576))} MB limit.`, 413, 'too_large', false)
+    throw new VideoApiError(`GET ${path}: the clip is ${String(Math.round(data.byteLength / 1_048_576))} MB, over the configured ${String(Math.round(options.maxBytes / 1_048_576))} MB limit.`, 413, 'too_large', false)
   }
   return data
 }
@@ -427,8 +436,8 @@ export function pollDelay(attempt: number, intervalMs: number): number {
   return Math.min(MAX_POLL_INTERVAL_MS, intervalMs * 2 ** Math.min(3, attempt))
 }
 
-/** One-line human/agent status string for a job, used in tool output and logs. */
-export function describeJob(job: NinferJob): string {
+/** One-line status string for a job, used in tool output and logs. */
+export function describeJob(job: RemoteVideoJob): string {
   const parts = [`${job.id}: ${job.status}`, `progress ${String(Math.round(job.progress ?? 0))}%`]
   if (job.stage !== undefined) parts.push(`stage ${job.stage}`)
   if (job.queuePosition !== undefined) parts.push(`queue position ${String(job.queuePosition)}`)

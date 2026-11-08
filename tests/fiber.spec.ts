@@ -71,10 +71,10 @@ describe('fiber registration', () => {
     for (const tool of Object.values(tools)) walk(tool.parameters)
   })
 
-  it('honours the ninfer tool-name family', () => {
+  it('honours the prefixed tool-name family', () => {
     const { ctx, tools } = fakeContext()
-    apply(ctx, { toolNameSet: 'ninfer' })
-    expect(Object.keys(tools).sort()).toEqual(['ninfer_cancel_video', 'ninfer_check_video', 'ninfer_generate_video'])
+    apply(ctx, { toolNameSet: 'prefixed' })
+    expect(Object.keys(tools).sort()).toEqual(['videogen_cancel_video', 'videogen_check_video', 'videogen_generate_video'])
   })
 
   it('registers every browser route exactly once', () => {

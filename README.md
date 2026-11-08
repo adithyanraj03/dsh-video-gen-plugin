@@ -52,7 +52,7 @@ Open **Settings → Plugins → Video generation** (the card also appears on thi
 
 1. **Add endpoint** and give it a name.
 2. **Base URL** — the API root including its version prefix, for example `https://your-host/v1`.
-3. **API key** — paste the bearer token and press **Save key**. The token goes to the harness credential store under the name in the *Credential name* field (`VIDEO_GEN_KEY_<ENDPOINT>` by default); it never enters the settings JSON, the page state after saving, or any log. Point *Credential name* at an existing credential (for example `NINFER_API_KEY`) to reuse a key you already have.
+3. **API key** — paste the bearer token and press **Save key**. The token goes to the harness credential store under the name in the *Credential name* field (`VIDEO_GEN_KEY_<ENDPOINT>` by default); it never enters the settings JSON, the page state after saving, or any log. Point *Credential name* at a credential you already store (for example `MY_VIDEO_KEY`) to reuse it.
 4. **Test & fetch models** — the host calls `GET /models` on that endpoint with the key and puts the ids in the model picker. If your server does not expose `/models`, type the model id by hand; the probe then says so instead of failing silently.
 5. **Save settings**. The endpoint marked *use this endpoint* is the one tool calls use.
 
@@ -70,9 +70,9 @@ Every field is per endpoint, and the endpoint can override the global defaults (
 | `jobTimeoutMs` | `3600000` | Overall budget per job before it is abandoned. |
 | `saveToWorkspace` / `workspaceFolder` | `true` / `videos` | Also copy finished clips into the session workspace. |
 | `videosDir` | empty | Clip directory override; empty keeps `~/.dsh/plugins/video-gen/videos`. |
-| `toolNameSet` | `generic` | `generic` registers `generate_video` / `check_video` / `cancel_video`; `ninfer` registers the `ninfer_*` variants. |
+| `toolNameSet` | `generic` | `generic` registers `generate_video` / `check_video` / `cancel_video`; `prefixed` registers `videogen_generate_video` / `videogen_check_video` / `videogen_cancel_video`. |
 
-`toolNameSet` exists because tool names are global across plugins. The default verbs deliberately avoid `video_generate`, which `dsh-plugin-subscriptions` already registers for its Grok video tool — with both installed, claiming that name aborts the boot. If another plugin ever owns one of these names, the boot fails with `tool "<name>" is already registered`; switching `toolNameSet` to `ninfer` and restarting fixes that without uninstalling anything.
+`toolNameSet` exists because tool names are global across plugins. The default verbs deliberately avoid `video_generate`, which `dsh-plugin-subscriptions` already registers for its Grok video tool — with both installed, claiming that name aborts the boot. If another plugin ever owns one of these names, the boot fails with `tool "<name>" is already registered`; switching `toolNameSet` to `prefixed` and restarting fixes that without uninstalling anything.
 
 A config-only setup also works without the card: set `baseUrl`, `model`, and `apiKeyRef` in the plugin's `cordis.patch.yml` row. The card then shows that endpoint as *Configured endpoint* and can still take over.
 

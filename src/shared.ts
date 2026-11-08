@@ -104,12 +104,20 @@ export const DEFAULT_WORKSPACE_FOLDER = 'videos'
 /** How many finished job records the store keeps on disk. */
 export const DEFAULT_JOB_HISTORY = 50
 
-/** Tool name families. `generic` owns the plain verbs; `ninfer` coexists with other video plugins. */
-export const TOOL_NAME_SET_VALUES = ['generic', 'ninfer'] as const
+/**
+ * Tool name families. `generic` owns the plain verbs; `prefixed` namespaces
+ * them so two video plugins can share one host without a name collision.
+ */
+export const TOOL_NAME_SET_VALUES = ['generic', 'prefixed'] as const
 export type ToolNameSet = (typeof TOOL_NAME_SET_VALUES)[number]
+export const PREFIXED_TOOL_NAMES = {
+  generate: 'videogen_generate_video',
+  status: 'videogen_check_video',
+  cancel: 'videogen_cancel_video',
+} as const
 export const TOOL_NAME_SETS: Record<ToolNameSet, { generate: string; status: string; cancel: string }> = {
   generic: { generate: 'generate_video', status: 'check_video', cancel: 'cancel_video' },
-  ninfer: { generate: 'ninfer_generate_video', status: 'ninfer_check_video', cancel: 'ninfer_cancel_video' },
+  prefixed: PREFIXED_TOOL_NAMES,
 }
 
 /** How long the generate call holds the turn before handing back a job id. */

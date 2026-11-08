@@ -8,7 +8,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { Config, resolveVideoTarget, toolNames } from './config.js'
 import { requireApiKey, resolveApiKey } from './credentials.js'
 import { VideoJobStore, toJobView, type SubmitRequest } from './jobs.js'
-import { createClient, getModels, getVideo, type NinferError } from './ninfer.js'
+import { createClient, getModels, getVideo } from './video-api.js'
 import { resolveReference } from './reference-image.js'
 import { describeSettingsHealth, serveSettingsHealth } from './settings-health.js'
 import { credentialPorts, serveCredential, serveModels } from './settings-route.js'
@@ -273,13 +273,13 @@ export function apply(ctx: Context, config: Config = {}): void {
       ctx.tools.register(tool)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      throw new Error(`${message} — another plugin owns that tool name. Set toolNameSet to "ninfer" in Settings > Plugins > Video generation and restart the host to register this plugin's tools as ninfer_video_* instead.`)
+      throw new Error(`${message} — another plugin owns that tool name. Set toolNameSet to "prefixed" in Settings > Plugins > Video generation and restart the host to register this plugin's tools as videogen_* instead.`)
     }
   }
 
   registerTool(defineTool({
     name: names.generate,
-    description: 'Generate a short video with audio from a prompt via Ninfer LTX-2.5. Use when the user asks for a video, clip, or animation; pass image_url, source_attachment_id, or source_path to animate a still picture as the first frame. Describe subject, motion, camera, lighting, and the sound or dialogue you want. Long renders return a job id: follow it with check_video, stop it with cancel_video. Do not call read or glob to verify the result; the clip plays in the tool card.',
+    description: 'Generate a short video with audio from a prompt through the configured video endpoint. Use when the user asks for a video, clip, or animation; pass image_url, source_attachment_id, or source_path to animate a still picture as the first frame. Describe subject, motion, camera, lighting, and the sound or dialogue you want. Long renders return a job id: follow it with check_video, stop it with cancel_video. Do not call read or glob to verify the result; the clip plays in the tool card.',
     parameters: {
       prompt: { type: 'string', required: true, description: 'Complete shot description: subject, motion, camera, lighting, and the ambient sound or dialogue the clip should carry.' },
       seconds: { type: 'integer', description: 'Clip length in whole seconds, 1-30. Omit to use the configured default (5).' },
@@ -289,7 +289,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       seed: { type: 'integer', description: 'Optional seed for a reproducible shot; reuse a seed to iterate on the same framing.' },
       enhance: { type: 'string', enum: [...ENHANCE_MODES], description: 'default follows the saved setting; on runs the server prompt enhancer first (adds 1-2 minutes), off skips it.' },
       negative_prompt: { type: 'string', description: 'What to keep out of the shot, e.g. "no text, no watermark, no camera shake".' },
-      model: { type: 'string', description: 'Optional model id for this call only; omit to use the configured model (ltx-2.5).' },
+      model: { type: 'string', description: 'Optional model id for this call only; omit to use the model configured on the active endpoint.' },
       image_url: { type: 'string', description: 'http(s) URL of a PNG/JPEG/WebP picture to use as the first frame; the clip animates from it.' },
       source_attachment_id: { type: 'string', description: 'Attachment id of an image already in this conversation, used as the first frame.' },
       source_path: { type: 'string', description: 'Path inside the session workspace to a PNG/JPEG/WebP picture, used as the first frame.' },
@@ -338,6 +338,7 @@ export function apply(ctx: Context, config: Config = {}): void {
           : normalizeVideoSize(input.size, orientation, target.defaultSize)
       const negativePrompt = (input.negative_prompt ?? '').trim() || target.negativePrompt
       const request: SubmitRequest = {
+        endpointId: target.connectionId,
         model,
         prompt,
         seconds,
@@ -374,7 +375,7 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   registerTool(defineTool({
     name: names.status,
-    description: 'Check one video job, or list the recent ones, on this host and on the Ninfer server. Use after generate_video returns a job id, when the user asks whether a clip is ready, or to recover a job when the tool call was interrupted. Returns status, progress, stage, queue position, the stored file paths, and the failure reason when a job failed.',
+    description: 'Check one video job, or list the recent ones, on this host and on the configured endpoint. Use after generate_video returns a job id, when the user asks whether a clip is ready, or to recover a job when the tool call was interrupted. Returns status, progress, stage, queue position, the stored file paths, and the failure reason when a job failed.',
     parameters: {
       job_id: { type: 'string', description: 'Job id such as video_1a2b3c4d5e6f. Omit to list the most recent jobs.' },
       limit: { type: 'integer', description: 'How many recent jobs to list when job_id is omitted; default 5, max 20.' },
@@ -415,8 +416,8 @@ export function apply(ctx: Context, config: Config = {}): void {
           const now = Date.now()
           record = await store.remember({
             id: job.id,
-            provider: 'ninfer',
-            model: job.model ?? current().model ?? 'ltx-2.5',
+            provider: current().activeConnection ?? 'video',
+            model: job.model ?? current().model ?? '',
             prompt: job.prompt ?? '',
             status: job.status === 'completed' ? 'completed' : job.status === 'failed' ? 'failed' : job.status === 'cancelled' ? 'cancelled' : job.status === 'queued' ? 'queued' : 'in_progress',
             progress: Math.round(job.progress ?? 0),
@@ -448,7 +449,7 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   registerTool(defineTool({
     name: names.cancel,
-    description: 'Cancel a queued or running video job on the Ninfer server so it stops occupying the GPU. Use when the user abandons a clip or wants the engine free for another render. A finished job is returned unchanged.',
+    description: 'Cancel a queued or running video job on the configured endpoint so it stops occupying the GPU. Use when the user abandons a clip or wants the engine free for another render. A finished job is returned unchanged.',
     parameters: {
       job_id: { type: 'string', required: true, description: 'Job id to cancel, such as video_1a2b3c4d5e6f.' },
     },
@@ -563,4 +564,3 @@ function installVideoSettings(ctx: Context, config: Config, hooks: SettingsHooks
 
 /** Exported for tests: the pure parts of this fiber. */
 export type { VideoResult }
-export type { NinferError }

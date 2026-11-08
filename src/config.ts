@@ -14,6 +14,7 @@ import {
   MAX_SECONDS,
   MIN_FPS,
   ORIENTATIONS,
+  TOOL_NAME_SETS,
   TOOL_NAME_SET_VALUES,
   defaultKeyRef,
   type Orientation,
@@ -102,7 +103,7 @@ export interface Config {
   resumeJobs?: boolean
   /** Finished job records kept in the on-disk history. */
   jobHistory?: number
-  /** `generic` claims the verb family; `ninfer` prefixes every tool name. */
+  /** `generic` claims the verb family; any other value namespaces every tool name. */
   toolNameSet?: ToolNameSet
 }
 
@@ -266,7 +267,6 @@ export function resolveVideoTarget(config: Config, connectionId?: string, modelO
 
 /** Tool names this build registers. */
 export function toolNames(config: Config): { generate: string; status: string; cancel: string } {
-  return config.toolNameSet === 'ninfer'
-    ? { generate: 'ninfer_generate_video', status: 'ninfer_check_video', cancel: 'ninfer_cancel_video' }
-    : { generate: 'generate_video', status: 'check_video', cancel: 'cancel_video' }
+  const set = config.toolNameSet ?? 'generic'
+  return TOOL_NAME_SETS[set === 'generic' ? 'generic' : 'prefixed']
 }

@@ -11,8 +11,8 @@ export { VideoSettingsCard } from './settings-card.js'
 export const name = 'dsh-video-gen/client'
 export const inject = ['slots', 'locale']
 
-/** Every tool name that renders the result card, including the `ninfer` family. */
-const TOOL_KEYS = ['generate_video', 'ninfer_generate_video', 'check_video', 'cancel_video', 'ninfer_check_video', 'ninfer_cancel_video'] as const
+/** Every tool name that renders the result card, including the prefixed family. */
+const TOOL_KEYS = ['generate_video', 'check_video', 'cancel_video', 'videogen_generate_video', 'videogen_check_video', 'videogen_cancel_video'] as const
 
 /** Read-only view of the host's settings scope for this plugin's entry. */
 interface ConfigFormsApi {

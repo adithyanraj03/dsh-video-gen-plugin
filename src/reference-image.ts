@@ -4,7 +4,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type { ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
 import { MAX_REFERENCE_BYTES, REFERENCE_MEDIA_TYPES, type ReferenceMediaType } from './shared.js'
-import type { ReferenceImage } from './ninfer.js'
+import type { ReferenceImage } from './video-api.js'
 
 /** A resolved start frame, with the metadata the size matcher and form need. */
 export interface ResolvedReference extends ReferenceImage {
@@ -90,7 +90,7 @@ export function imageSize(data: Uint8Array): { width: number; height: number } |
 export function validateReference(data: Uint8Array, source: string): { mediaType: ReferenceMediaType; width?: number; height?: number } {
   if (data.byteLength === 0) throw new Error(`the start-frame picture from ${source} is empty.`)
   if (data.byteLength > MAX_REFERENCE_BYTES) {
-    throw new Error(`the start-frame picture from ${source} is ${String(Math.round(data.byteLength / 1_048_576))} MB; Ninfer accepts one PNG/JPEG/WebP up to 20 MB — downscale it first.`)
+    throw new Error(`the start-frame picture from ${source} is ${String(Math.round(data.byteLength / 1_048_576))} MB; the video endpoint accepts one PNG/JPEG/WebP up to 20 MB — downscale it first.`)
   }
   const mediaType = sniffMediaType(data)
   if (mediaType === undefined) {
@@ -243,7 +243,7 @@ export async function referenceFromUrl(url: string, fetchFn: (input: string, ini
   if (!response.ok) throw new Error(`could not download the start-frame picture from ${parsed.href}: HTTP ${String(response.status)}.`)
   const declared = Number(response.headers.get('content-length') ?? '0')
   if (Number.isFinite(declared) && declared > MAX_REFERENCE_BYTES) {
-    throw new Error(`the start-frame picture at ${parsed.href} is ${String(Math.round(declared / 1_048_576))} MB; Ninfer accepts one PNG/JPEG/WebP up to 20 MB.`)
+    throw new Error(`the start-frame picture at ${parsed.href} is ${String(Math.round(declared / 1_048_576))} MB; the video endpoint accepts one PNG/JPEG/WebP up to 20 MB.`)
   }
   return referenceFromBytes(new Uint8Array(await response.arrayBuffer()), parsed.href, parsed.hostname)
 }
