@@ -52,7 +52,9 @@ export function apply(ctx: Context): void {
   // declare them must still get the tool card, so each registration is
   // contained instead of aborting this bundle's activation.
   const register = ctx.slots.register.bind(ctx.slots) as unknown as (options: object, component: unknown) => () => void
-  const injectSlot = ctx.slots.inject as unknown as (key: string, factory: () => (() => void) | Iterable<() => void>) => void
+  // `slots.inject` reads its own registry through `this`, so it must stay bound
+  // to the service; an unbound copy throws "reading 'ctx'" on every use.
+  const injectSlot = ctx.slots.inject.bind(ctx.slots) as unknown as (key: string, factory: () => (() => void) | Iterable<() => void>) => void
   const tryRegister = (slot: string, options: object, component: unknown): void => {
     try {
       injectSlot(slot, () => register(options, component))
