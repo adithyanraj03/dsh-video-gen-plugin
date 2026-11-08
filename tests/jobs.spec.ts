@@ -16,7 +16,7 @@ const record = (overrides: Partial<VideoJobRecord> = {}): VideoJobRecord => ({
 function fakeClient(states: string[], clip = new Uint8Array([1, 2, 3, 4])): { client: VideoApiClient; polls: () => number } {
   let polls = 0
   const client: VideoApiClient = {
-    baseURL: 'https://ninfer.test/v1',
+    baseURL: 'https://video.test/v1',
     token: 't',
     fetchFn: async (url) => {
       if (url.endsWith('/videos') ) {

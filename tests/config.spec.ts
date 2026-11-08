@@ -135,7 +135,7 @@ describe('credential naming', () => {
   })
 
   it('keeps an explicit reference', () => {
-    expect(connectionKeyRef({ id: 'host-a', apiKeyRef: 'NINFER_API_KEY' })).toBe('NINFER_API_KEY')
+    expect(connectionKeyRef({ id: 'host-a', apiKeyRef: 'MY_EXISTING_KEY' })).toBe('MY_EXISTING_KEY')
   })
 
   it('upper-cases and truncates the derived segment', () => {
