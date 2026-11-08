@@ -48,27 +48,34 @@ export function apply(ctx: Context): void {
 
   // The settings card sits on this plugin's own page in the plugin manager,
   // keyed by bundle package name, with the legacy per-plugin seat kept for
-  // hosts at or below 0.1.5. The slot-name union in the published types does
-  // not enumerate these two seats, so the registration goes through the same
-  // cast the sibling plugins use rather than pinning a stale list.
+  // hosts at or below 0.1.5. Both seats are optional: a host that does not
+  // declare them must still get the tool card, so each registration is
+  // contained instead of aborting this bundle's activation.
   const register = ctx.slots.register.bind(ctx.slots) as unknown as (options: object, component: unknown) => () => void
   const injectSlot = ctx.slots.inject as unknown as (key: string, factory: () => (() => void) | Iterable<() => void>) => void
-  injectSlot('plugins.bundle.config', () => register({
+  const tryRegister = (slot: string, options: object, component: unknown): void => {
+    try {
+      injectSlot(slot, () => register(options, component))
+    } catch (error) {
+      console.warn(`dsh-video-gen: the "${slot}" slot is unavailable (${error instanceof Error ? error.message : String(error)}); that card stays hidden`)
+    }
+  }
+  tryRegister('plugins.bundle.config', {
     name: 'plugins.bundle.config',
     key: 'dsh-video-gen',
     inject: () => ({ scope, health: health() }),
-  }, VideoSettingsCard))
-  injectSlot('settings.plugin.item', () => register({
+  }, VideoSettingsCard)
+  tryRegister('settings.plugin.item', {
     name: 'settings.plugin.item',
     key: VIDEO_GENERATION_NAMESPACE,
     inject: () => ({ scope, health: health() }),
-  }, VideoSettingsCard))
+  }, VideoSettingsCard)
 
   for (const key of TOOL_KEYS) {
-    ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
+    tryRegister('tool.call.toolview', {
       name: 'tool.call.toolview',
       key,
       inject: (): VideoCardFace => ({ lang: language() }),
-    }, VideoResultCard))
+    }, VideoResultCard)
   }
 }
