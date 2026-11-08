@@ -90,12 +90,12 @@ Served same-origin by the plugin, gated by the harness connection trust decision
 ```powershell
 pnpm run typecheck   # tsc --noEmit
 pnpm run build       # clean lib/, tsc to lib/types, tsdown host + client bundles
-pnpm run test        # vitest: 71 cases over sizing, the API client, the job store, and the routes
+pnpm run test        # vitest: 94 cases over sizing, the API client, the job store, the routes, and fiber registration
 pnpm run test:package
 pnpm run pack:check
 ```
 
-Layout: `src/*.ts` is the host fiber (`index.ts` registers the tools and routes), `src/client/` is the browser bundle (the tool result card), `tests/` covers the pure parts. `lib/index.js` and `lib/client.js` are build outputs and are not committed.
+Layout: `src/*.ts` is the host fiber (`index.ts` registers the tools and routes), `src/client/` is the browser bundle (the tool result card), `tests/` covers the pure parts. `lib/index.js` and `lib/client.js` are build outputs and are not committed. The icon is rendered deterministically by `scripts/make-icon.py` (Pillow, no network) and then masked by the harness icon pipeline into `assets/icon.png`.
 
 ## Limits and known behaviour
 
