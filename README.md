@@ -105,6 +105,7 @@ Layout: `src/*.ts` is the host fiber (`index.ts` registers the tools and routes)
 - The start-frame picture has to reach the API: `image_url` is fetched by the host, so an authenticated or local-only URL will not work — use `source_attachment_id` or `source_path` instead.
 - Without a web profile the tools still run, but no card, no progress, and no inline playback.
 - A restarted Ninfer server forgets job ids; `video_status` then reports the 404 verbatim so the fix ("submit again") is obvious.
+- The desktop app and `dsh web` can both load this plugin, but they share one clip directory and each keeps its own `jobs.json`, so they overwrite each other's history. Point `videosDir` at a separate folder per host when you run both.
 
 ## Compatibility
 
