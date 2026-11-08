@@ -41,12 +41,12 @@ describe('fiber registration', () => {
   it('registers the three generic tools with concrete descriptions', () => {
     const { ctx, tools } = fakeContext()
     apply(ctx, {})
-    expect(Object.keys(tools).sort()).toEqual(['video_cancel', 'video_generate', 'video_status'])
+    expect(Object.keys(tools).sort()).toEqual(['cancel_video', 'check_video', 'generate_video'])
     for (const tool of Object.values(tools)) {
       expect(tool.description.length).toBeGreaterThan(40)
       expect(tool.description.length).toBeLessThan(1200)
     }
-    expect(Object.keys((tools.video_generate!.parameters as { properties: Record<string, unknown> }).properties)).toContain('prompt')
+    expect(Object.keys((tools.generate_video!.parameters as { properties: Record<string, unknown> }).properties)).toContain('prompt')
   })
 
   it('never exposes a boolean tool parameter, which the harness refuses to model well', () => {
@@ -66,7 +66,7 @@ describe('fiber registration', () => {
   it('honours the ninfer tool-name family', () => {
     const { ctx, tools } = fakeContext()
     apply(ctx, { toolNameSet: 'ninfer' })
-    expect(Object.keys(tools).sort()).toEqual(['ninfer_video_cancel', 'ninfer_video_generate', 'ninfer_video_status'])
+    expect(Object.keys(tools).sort()).toEqual(['ninfer_cancel_video', 'ninfer_check_video', 'ninfer_generate_video'])
   })
 
   it('registers every browser route exactly once', () => {
@@ -99,21 +99,21 @@ describe('tool execute guards', () => {
   it('refuses an empty prompt before touching the network', async () => {
     const { ctx, tools } = fakeContext()
     apply(ctx, {})
-    await expect(tools.video_generate!.execute({ prompt: '   ' }, { signal: new AbortController().signal }))
+    await expect(tools.generate_video!.execute({ prompt: '   ' }, { signal: new AbortController().signal }))
       .rejects.toThrow(/non-empty prompt/)
   })
 
-  it('asks for a job id when video_cancel is called without one', async () => {
+  it('asks for a job id when cancel_video is called without one', async () => {
     const { ctx, tools } = fakeContext()
     apply(ctx, {})
-    await expect(tools.video_cancel!.execute({ job_id: ' ' }, { signal: new AbortController().signal }))
+    await expect(tools.cancel_video!.execute({ job_id: ' ' }, { signal: new AbortController().signal }))
       .rejects.toThrow(/needs the job id/)
   })
 
   it('reports a job id this host and the server both miss', async () => {
     const { ctx, tools } = fakeContext()
     apply(ctx, {})
-    await expect(tools.video_status!.execute({ job_id: 'video_missing' }, { signal: new AbortController().signal }))
+    await expect(tools.check_video!.execute({ job_id: 'video_missing' }, { signal: new AbortController().signal }))
       .rejects.toThrow()
   })
 })
@@ -141,6 +141,6 @@ describe('renderers', () => {
       seconds: 5, size: '1280x704', fromPicture: true, waitedMs: 0, queuePosition: 1, stage: 'render',
     })
     expect(text).toMatch(/still in_progress/)
-    expect(text).toMatch(/video_status/)
+    expect(text).toMatch(/check_video/)
   })
 })

@@ -229,7 +229,7 @@ function VideoList({ metas, lang }: { metas: VideoMeta[]; lang: Lang }) {
   )
 }
 
-/** The keyed `tool.call.toolview` component for video_generate and its siblings. */
+/** The keyed `tool.call.toolview` component for generate_video and its siblings. */
 export function VideoResultCard(props: VideoCardProps) {
   const lang: Lang = props.lang ?? 'en'
   const meta = readVideoMeta(props.block)

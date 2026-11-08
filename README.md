@@ -8,13 +8,13 @@ Video generation for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-
 
 | Surface | Behaviour |
 | --- | --- |
-| `video_generate` | Queues a clip. `prompt` is required; `seconds`, `size`, `orientation`, `fps`, `seed`, `enhance`, `negative_prompt` and `model` are optional. |
+| `generate_video` | Queues a clip. `prompt` is required; `seconds`, `size`, `orientation`, `fps`, `seed`, `enhance`, `negative_prompt` and `model` are optional. |
 | Start frame | Pass `image_url`, `source_attachment_id` (an image already in the chat), or `source_path` (a file in the session workspace). That picture becomes the clip's **first frame**; the clip is rendered from it. |
-| `video_status` | One job by id, or the recent list. Also adopts a job id this host never saw by asking the server. |
-| `video_cancel` | Stops a queued or running render so the GPU frees up. |
+| `check_video` | One job by id, or the recent list. Also adopts a job id this host never saw by asking the server. |
+| `cancel_video` | Stops a queued or running render so the GPU frees up. |
 | Tool card | The finished MP4 plays inline with native controls and seeks via `Range` requests; while rendering, the same card shows progress, stage, and queue position. |
 
-Long renders do not hold the conversation: `video_generate` waits for `waitGraceMs` (default 2 minutes) and then returns the job id. Use `wait: "until_done"` to block for the whole render, or `wait: "none"` to return immediately.
+Long renders do not hold the conversation: `generate_video` waits for `waitGraceMs` (default 2 minutes) and then returns the job id. Use `wait: "until_done"` to block for the whole render, or `wait: "none"` to return immediately.
 
 ## Requirements
 
@@ -55,13 +55,13 @@ Every option lives under Settings → Plugins → Video generation. Defaults are
 | `apiKeyRef` | `NINFER_API_KEY` | Credential reference the bearer token resolves through. |
 | `defaultSeconds` / `defaultSize` / `defaultFps` | `5` / `720p` / `24` | Used when the call omits them. |
 | `defaultEnhance` | `false` | Server-side prompt enhancer before rendering (adds 1–2 minutes). |
-| `waitGraceMs` | `120000` | How long `video_generate` holds the turn. |
+| `waitGraceMs` | `120000` | How long `generate_video` holds the turn. |
 | `jobTimeoutMs` | `3600000` | Overall budget per job before it is abandoned. |
 | `saveToWorkspace` / `workspaceFolder` | `true` / `videos` | Also copy finished clips into the session workspace. |
 | `videosDir` | empty | Clip directory override; empty keeps `~/.dsh/plugins/video-gen/videos`. |
-| `toolNameSet` | `generic` | `generic` claims `video_generate`; `ninfer` registers `ninfer_video_*` instead. |
+| `toolNameSet` | `generic` | `generic` registers `generate_video` / `check_video` / `cancel_video`; `ninfer` registers the `ninfer_*` variants. |
 
-`toolNameSet` exists because tool names are global: if another plugin already owns `video_generate`, boot fails with `tool "video_generate" is already registered`. Switching to `ninfer` and restarting fixes that without uninstalling anything.
+`toolNameSet` exists because tool names are global across plugins. The default verbs deliberately avoid `video_generate`, which `dsh-plugin-subscriptions` already registers for its Grok video tool — with both installed, `video_generate` would abort the boot. If another plugin ever owns one of these names, the boot fails with `tool "<name>" is already registered`; switching `toolNameSet` to `ninfer` and restarting fixes that without uninstalling anything.
 
 ## How a job runs
 
@@ -104,7 +104,7 @@ Layout: `src/*.ts` is the host fiber (`index.ts` registers the tools and routes)
 - A start frame without an explicit `size` picks the box orientation from the picture's aspect ratio.
 - The start-frame picture has to reach the API: `image_url` is fetched by the host, so an authenticated or local-only URL will not work — use `source_attachment_id` or `source_path` instead.
 - Without a web profile the tools still run, but no card, no progress, and no inline playback.
-- A restarted Ninfer server forgets job ids; `video_status` then reports the 404 verbatim so the fix ("submit again") is obvious.
+- A restarted Ninfer server forgets job ids; `check_video` then reports the 404 verbatim so the fix ("submit again") is obvious.
 - The desktop app and `dsh web` can both load this plugin, but they share one clip directory and each keeps its own `jobs.json`, so they overwrite each other's history. Point `videosDir` at a separate folder per host when you run both.
 
 ## Compatibility

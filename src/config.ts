@@ -56,7 +56,7 @@ export interface Config {
   /** Negative prompt merged into every job unless the call passes its own. */
   negativePrompt?: string
   pollIntervalMs?: number
-  /** How long `video_generate` waits before handing back a job id. */
+  /** How long `generate_video` waits before handing back a job id. */
   waitGraceMs?: number
   /** Overall budget for one job before it is abandoned as timed out. */
   jobTimeoutMs?: number
@@ -74,7 +74,7 @@ export interface Config {
   resumeJobs?: boolean
   /** Finished job records kept in the on-disk history. */
   jobHistory?: number
-  /** `generic` claims video_generate; `ninfer` keeps both video plugins usable. */
+  /** `generic` claims the generate_video verb family; `ninfer` keeps both video plugins usable. */
   toolNameSet?: ToolNameSet
 }
 
@@ -164,8 +164,8 @@ export function resolveVideoTarget(config: Config): VideoTarget {
 export function toolNames(config: Config): { generate: string; status: string; cancel: string } {
   const set = config.toolNameSet === 'ninfer' ? 'ninfer' : 'generic'
   return set === 'ninfer'
-    ? { generate: 'ninfer_video_generate', status: 'ninfer_video_status', cancel: 'ninfer_video_cancel' }
-    : { generate: 'video_generate', status: 'video_status', cancel: 'video_cancel' }
+    ? { generate: 'ninfer_generate_video', status: 'ninfer_check_video', cancel: 'ninfer_cancel_video' }
+    : { generate: 'generate_video', status: 'check_video', cancel: 'cancel_video' }
 }
 
 /** Apply a per-call model override on top of the saved config. */

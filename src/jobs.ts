@@ -2,7 +2,7 @@
  * Video job store: submit, poll, download, and remember.
  *
  * The store is the single owner of job state. A tool call waits on it for a
- * grace window and can then be re-queried through `video_status`, so a long
+ * grace window and can then be re-queried through `check_video`, so a long
  * render never holds the conversation hostage. Job records persist to
  * `jobs.json` next to the clips, which lets a restarted host re-attach to
  * renders the server is still working on.
@@ -432,7 +432,7 @@ export class VideoJobStore {
   /** Ask the server to stop, then mark the record cancelled. */
   async cancel(id: string): Promise<VideoJobRecord> {
     const record = this.records.get(id)
-    if (record === undefined) throw new Error(`job ${id} is unknown to this host; video_status lists the ids it tracks.`)
+    if (record === undefined) throw new Error(`job ${id} is unknown to this host; check_video lists the ids it tracks.`)
     if (isTerminalStatus(record.status)) return record
     const client = await this.options.client()
     try {

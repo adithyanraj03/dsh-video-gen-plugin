@@ -85,12 +85,12 @@ describe('resolveVideoTarget', () => {
 
 describe('tool names', () => {
   it('claims the generic family by default', () => {
-    expect(toolNames(resolved({}))).toEqual({ generate: 'video_generate', status: 'video_status', cancel: 'video_cancel' })
+    expect(toolNames(resolved({}))).toEqual({ generate: 'generate_video', status: 'check_video', cancel: 'cancel_video' })
   })
 
   it('falls back to the ninfer family when asked', () => {
     expect(toolNames(resolved({ toolNameSet: 'ninfer' }))).toEqual({
-      generate: 'ninfer_video_generate', status: 'ninfer_video_status', cancel: 'ninfer_video_cancel',
+      generate: 'ninfer_generate_video', status: 'ninfer_check_video', cancel: 'ninfer_cancel_video',
     })
   })
 })

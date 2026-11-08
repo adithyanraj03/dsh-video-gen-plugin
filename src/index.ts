@@ -46,7 +46,7 @@ export { VIDEO_ROUTE, THUMB_ROUTE, JOBS_ROUTE, CANCEL_ROUTE, TEST_CONNECTION_ROU
 export const name = 'dsh-video-gen'
 export const inject = ['tools', 'attachments', 'credentials']
 
-/** Arguments of `video_generate`, as the tool schema describes them. */
+/** Arguments of `generate_video`, as the tool schema describes them. */
 interface GenerateArgs {
   prompt: string
   seconds?: number | undefined
@@ -120,7 +120,7 @@ export function renderVideoResult(value: VideoResult): string {
   if (value.status === 'failed' || value.status === 'cancelled' || value.status === 'interrupted') {
     return `Video job ${value.jobId} ${value.status} (${spec}): ${value.error ?? 'no detail from the server'}\nPrompt: ${value.prompt}`
   }
-  return `Video job ${value.jobId} is still ${value.status} (${String(value.progress)}%${value.stage === undefined ? '' : `, ${value.stage}`}${value.queuePosition === undefined ? '' : `, queue ${String(value.queuePosition)}`}).\nCall video_status with job_id "${value.jobId}" to follow it, or video_cancel to stop it. The clip is stored on this host when it finishes.\nPrompt: ${value.prompt}`
+  return `Video job ${value.jobId} is still ${value.status} (${String(value.progress)}%${value.stage === undefined ? '' : `, ${value.stage}`}${value.queuePosition === undefined ? '' : `, queue ${String(value.queuePosition)}`}).\nCall check_video with job_id "${value.jobId}" to follow it, or cancel_video to stop it. The clip is stored on this host when it finishes.\nPrompt: ${value.prompt}`
 }
 
 /** Leaf name of a stored path, for the tool result card. */
@@ -276,7 +276,7 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   registerTool(defineTool({
     name: names.generate,
-    description: 'Generate a short video with audio from a prompt via Ninfer LTX-2.5. Use when the user asks for a video, clip, or animation; pass image_url, source_attachment_id, or source_path to animate a still picture as the first frame. Describe subject, motion, camera, lighting, and the sound or dialogue you want. Long renders return a job id: follow it with video_status, stop it with video_cancel. Do not call read or glob to verify the result; the clip plays in the tool card.',
+    description: 'Generate a short video with audio from a prompt via Ninfer LTX-2.5. Use when the user asks for a video, clip, or animation; pass image_url, source_attachment_id, or source_path to animate a still picture as the first frame. Describe subject, motion, camera, lighting, and the sound or dialogue you want. Long renders return a job id: follow it with check_video, stop it with cancel_video. Do not call read or glob to verify the result; the clip plays in the tool card.',
     parameters: {
       prompt: { type: 'string', required: true, description: 'Complete shot description: subject, motion, camera, lighting, and the ambient sound or dialogue the clip should carry.' },
       seconds: { type: 'integer', description: 'Clip length in whole seconds, 1-30. Omit to use the configured default (5).' },
@@ -358,13 +358,13 @@ export function apply(ctx: Context, config: Config = {}): void {
       } catch (error) {
         if (exec.signal.aborted) {
           await store.cancel(submitted.id).catch(() => undefined)
-          throw new Error(`${names.generate} was stopped, so job ${submitted.id} was cancelled on the server. Call video_status to confirm its state.`)
+          throw new Error(`${names.generate} was stopped, so job ${submitted.id} was cancelled on the server. Call check_video to confirm its state.`)
         }
         throw error
       }
       const result = toResult(record, target.jobTimeoutMs - Math.max(0, target.jobTimeoutMs - (Date.now() - submitted.createdAt)))
       if (timedOut && record.status !== 'completed') {
-        result.note = `still rendering; poll video_status with job_id "${record.id}".`
+        result.note = `still rendering; poll check_video with job_id "${record.id}".`
       }
       return result
     },
@@ -372,7 +372,7 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   registerTool(defineTool({
     name: names.status,
-    description: 'Check one video job, or list the recent ones, on this host and on the Ninfer server. Use after video_generate returns a job id, when the user asks whether a clip is ready, or to recover a job when the tool call was interrupted. Returns status, progress, stage, queue position, the stored file paths, and the failure reason when a job failed.',
+    description: 'Check one video job, or list the recent ones, on this host and on the Ninfer server. Use after generate_video returns a job id, when the user asks whether a clip is ready, or to recover a job when the tool call was interrupted. Returns status, progress, stage, queue position, the stored file paths, and the failure reason when a job failed.',
     parameters: {
       job_id: { type: 'string', description: 'Job id such as video_1a2b3c4d5e6f. Omit to list the most recent jobs.' },
       limit: { type: 'integer', description: 'How many recent jobs to list when job_id is omitted; default 5, max 20.' },
@@ -468,7 +468,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     async execute(args): Promise<VideoResult> {
       const input = args as { job_id: string }
       const id = input.job_id.trim()
-      if (id.length === 0) throw new Error('video_cancel needs the job id returned by video_generate; video_status lists the ids this host tracks.')
+      if (id.length === 0) throw new Error('cancel_video needs the job id returned by generate_video; check_video lists the ids this host tracks.')
       const record = await store.cancel(id)
       return toResult(record, 0)
     },

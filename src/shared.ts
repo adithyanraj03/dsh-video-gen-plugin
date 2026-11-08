@@ -89,8 +89,8 @@ export const DEFAULT_JOB_HISTORY = 50
 export const TOOL_NAME_SET_VALUES = ['generic', 'ninfer'] as const
 export type ToolNameSet = (typeof TOOL_NAME_SET_VALUES)[number]
 export const TOOL_NAME_SETS: Record<ToolNameSet, { generate: string; status: string; cancel: string }> = {
-  generic: { generate: 'video_generate', status: 'video_status', cancel: 'video_cancel' },
-  ninfer: { generate: 'ninfer_video_generate', status: 'ninfer_video_status', cancel: 'ninfer_video_cancel' },
+  generic: { generate: 'generate_video', status: 'check_video', cancel: 'cancel_video' },
+  ninfer: { generate: 'ninfer_generate_video', status: 'ninfer_check_video', cancel: 'ninfer_cancel_video' },
 }
 
 /** How long the generate call holds the turn before handing back a job id. */
