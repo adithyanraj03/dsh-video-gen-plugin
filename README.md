@@ -7,6 +7,8 @@
 
 # dsh-video-gen
 
+English | [中文](README.zh.md)
+
 Video generation for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): text-to-video, image-to-video from a start frame, a clip that plays in the conversation, live progress, and cancel — against **your own** OpenAI-style asynchronous video API. No vendor is baked in; you add endpoints in Settings.
 
 ![language](https://img.shields.io/badge/language-typescript-3178c6) ![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg) ![node](https://img.shields.io/badge/node-%E2%89%A5%2022-brightgreen) ![dsh](https://img.shields.io/badge/dsh-web%20profile-orange) ![runtime](https://img.shields.io/badge/runtime-your%20own%20endpoint-brightgreen) ![tests](https://img.shields.io/badge/tests-146%20passing-brightgreen)
@@ -143,7 +145,7 @@ Served same-origin by the plugin, gated by the harness connection trust decision
 ```powershell
 pnpm run typecheck   # tsc --noEmit
 pnpm run build       # clean lib/, ts scoped to lib/types, tsdown host + client bundles
-pnpm run test        # vitest: 142 cases
+pnpm run test        # vitest: 146 cases
 pnpm run test:package
 pnpm run pack:check
 ```

@@ -21,3 +21,7 @@ tools/asar-x/
 # Clips the plugin copies into this workspace after a render.
 /video-*.mp4
 /video-*.jpg
+
+# Local publishing notes — kept out of the public repo.
+PUBLISHING.md
+MARKETPLACE.md
