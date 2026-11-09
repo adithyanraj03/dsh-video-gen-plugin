@@ -1,4 +1,24 @@
 // Harness wiring for the panel QA page (classic script; run after the panel JS).
+// `?card=1` isolates one panel at the top-left corner, so a screenshot can be
+// cropped to an exact 760x418 card for the README banner.
+const cardMode = new URLSearchParams(location.search).get('card') === '1'
+if (cardMode) {
+  document.documentElement.style.padding = '0'
+  document.documentElement.style.margin = '0'
+  document.body.style.margin = '0'
+  document.body.style.padding = '0'
+  document.body.style.background = '#14161d'
+  // Hide, never remove: the log dump is written through these elements.
+  for (const node of document.querySelectorAll('h2, .label, pre')) node.style.display = 'none'
+  const cards = document.querySelectorAll('.card')
+  if (cards[1] !== undefined) cards[1].style.display = 'none'
+  if (cards[0] !== undefined) {
+    cards[0].style.cssText += ';margin:0;padding:0;max-width:none;border:0;border-radius:0;background:transparent'
+    // Keep only the sheet itself: no status chip, no prompt line.
+    for (const child of cards[0].children) if (child.id !== 'host1') child.style.display = 'none'
+  }
+}
+
 const errs = document.getElementById('errs')
 const log = (...a) => { errs.textContent += a.map(String).join(' ') + '\n' }
 window.addEventListener('error', (e) => log('window.onerror: ' + e.message + ' @ ' + e.filename + ':' + e.lineno))

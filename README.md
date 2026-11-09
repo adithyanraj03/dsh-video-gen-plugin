@@ -1,8 +1,15 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.png">
+  <img alt="dsh-video-gen" src="assets/banner-light.png" width="1012">
+</picture>
+
+<br>
+
 # dsh-video-gen
 
 Video generation for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): text-to-video, image-to-video from a start frame, a clip that plays in the conversation, live progress, and cancel — against **your own** OpenAI-style asynchronous video API. No vendor is baked in; you add endpoints in Settings.
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![language](https://img.shields.io/badge/language-typescript-3178c6) ![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg) ![node](https://img.shields.io/badge/node-%E2%89%A5%2022-brightgreen) ![dsh](https://img.shields.io/badge/dsh-web%20profile-orange) ![runtime](https://img.shields.io/badge/runtime-your%20own%20endpoint-brightgreen) ![tests](https://img.shields.io/badge/tests-146%20passing-brightgreen)
 
 ## What it does
 
@@ -13,6 +20,8 @@ Video generation for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-
 | `check_video` | One job by id, or the recent list. Also adopts a job id this host never saw by asking the server. |
 | `cancel_video` | Stops a queued or running render so the GPU frees up. |
 | Tool card | The finished MP4 plays inline with native controls and seeks via `Range` requests; while rendering, the card shows the NInfer "being made" sheet — ripples, plain-words stage, percent, and time — with a cancel button, and ripples the first frame in when the clip is ready. |
+
+![The card while a clip renders](assets/card-rendering.png)
 
 Long renders do not hold the conversation: `generate_video` waits for `waitGraceMs` (default 2 minutes) and then returns the job id. Use `wait: "until_done"` to block for the whole render, or `wait: "none"` to return immediately.
 
@@ -26,7 +35,22 @@ The plugin ships with **no endpoint configured**. That is deliberate: it is publ
 
 ## Install
 
-Local checkout:
+> **The npm name is taken.** `dsh-video-gen` on the registry is a *different* plugin (Yang-wudi's DashScope/Veo/Sora tool), so `dsh plugin add dsh-video-gen` installs that one, not this. This repo ships its own build as a release tarball; install it by URL or by path.
+
+**From the latest release** — the tarball is attached to every release as `plugin.tgz`:
+
+```powershell
+cd C:\Users\<you>\.dsh\profiles\web
+pnpm add https://github.com/adithyanraj03/dsh-video-gen/releases/latest/download/plugin.tgz
+```
+
+Then add the name to `dsh.profile.bundles` in that profile's `package.json` and restart the host:
+
+```json
+"dsh": { "profile": { "bundles": ["dsh-video-gen"] } }
+```
+
+**From a local checkout** (what this repo's own development uses):
 
 ```powershell
 pnpm install
@@ -42,9 +66,9 @@ Then link it into a profile and add it to that profile's bundles:
 pnpm install --dir C:\Users\<you>\.dsh\profiles\web
 ```
 
-Restart the host afterwards: the tools register at boot. The browser half hot-reloads.
+**In the desktop app** — Settings → **Plugins** → **Add plugin**, then paste the repository address (`https://github.com/adithyanraj03/dsh-video-gen`). Installed plugins do not update themselves yet: uninstall and install again to upgrade.
 
-From a tarball or the registry, install the package instead of linking it — never both, or the same plugin boots twice.
+A profile must load exactly one copy. Installing the tarball while the link row is still there boots the plugin twice.
 
 ## Configure: add an endpoint
 
@@ -96,50 +120,6 @@ Fields sent on submit: `model`, `prompt`, `seconds` (as a string), `size` (`WxH`
 2. The store polls every 3 s, backing off up to 30 s while the network or the server misbehaves. Polling survives a host restart: unfinished jobs are re-attached on boot.
 3. On completion the MP4 is streamed (bounded by `maxVideoBytes`), written atomically, and the thumbnail is fetched.
 4. A finished clip is copied into the session workspace exactly once; job history is kept in `jobs.json` next to the clips (last 50 by default).
-
-## The render card (NInfer sheet)
-
-While a job is queued or rendering, the tool card draws the NInfer Monitor's
-"video being made" panel — a faithful port of `ninfer_monitor/web/ui-video.js`
-(spec: `vid-gen-panel.md` in this repo) into `src/client/video-panel.ts`:
-
-- **The sheet** — one WebGL pass: ripples start at uneven times and places and
-  bend everything on the sheet, its words included; smoke curls under misty
-  glass; a tiny crosshatch mesh lifts white only where a ripple passes. The
-  sheet shows the stage in plain words, the percent, the time since the job
-  was created, and a progress bar along the bottom edge.
-- **The reveal** — when the clip is ready, a slow wave from the centre brings
-  up its first frame; the sheet then hands over to a `<video>` player with
-  native controls on that frame. A fresh `generate_video` autoplays **muted**
-  (browsers refuse an audible autoplay, and a clip that starts talking on its
-  own is rude — the native controls unmute it); a `check_video` that finds an
-  already-finished job ripples it in paused.
-- **The progress log** — the line under the sheet follows the NInfer log
-  format, `<describe(job)> · <seconds since creation>` ("84% · Generating the
-  frames · 14 s"), refreshed on every 2 s poll so a cold start never reads as
-  frozen. Above it sits the `size · Ns · seed N` row with a **✕ Cancel**
-  button (posts to the plugin's cancel route) and the `Processing…` row with
-  the model chip.
-- **Failures** — the sheet greys with a `✕` (cancelled) or `⚠️` and the
-  reason; the tool text below carries the same detail.
-- **The wait grace** — while `generate_video` is still holding the turn (its
-  `wait` grace, up to the render), the harness has no result metadata yet, so
-  the card drives the sheet from the call arguments and follows the real job
-  by its prompt (same 2 s poll as after the result lands): percent, stage,
-  the ✕ Cancel button, and the reveal all behave identically.
-- **Promoted result** — on hosts with the `uiConversation` service (the
-  promoted-result mechanism dsh-image-gen uses), a settled `generate_video`
-  result becomes a session-located chat row (kind `dsh-video-result`) that
-  stays visible even when the Tool process folds — the same "final image"
-  behaviour the image plugin has. The tool card then shows only
-  "Video is shown in the conversation". `check_video`/`cancel_video` and
-  legacy hosts without the service keep the full card inside the tool call.
-
-The raw stage vocabulary is translated by the same rules as the NInfer page
-(`Pausing the language model`, `Loading the models`, `Generating the frames`,
-`Saving the video`, …); an unknown stage is shown verbatim. Without WebGL a
-static CSS sheet with the same words is shown instead, and with the system's
-"Reduce Motion" setting the water stands still.
 
 ## Browser routes
 
