@@ -58,6 +58,7 @@
     "typecheck": "tsc --noEmit",
     "build": "node scripts/clean-lib.mjs && tsc && tsdown",
     "prepare": "pnpm run build",
+    "prepublishOnly": "pnpm run typecheck && pnpm test",
     "test": "vitest run",
     "test:package": "node scripts/check-package.mjs",
     "pack:check": "pnpm pack --dry-run"

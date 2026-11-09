@@ -9,7 +9,7 @@
 
 [English](README.md) | 中文
 
-![language](https://img.shields.io/badge/language-typescript-3178c6) ![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg) ![node](https://img.shields.io/badge/node-%E2%89%A5%2022-brightgreen) ![dsh](https://img.shields.io/badge/dsh-web%20profile-orange) ![runtime](https://img.shields.io/badge/runtime-your%20own%20endpoint-brightgreen) ![tests](https://img.shields.io/badge/tests-146%20passing-brightgreen)
+![npm](https://img.shields.io/npm/v/dsh-video-gen-plugin) ![language](https://img.shields.io/badge/language-typescript-3178c6) ![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg) ![node](https://img.shields.io/badge/node-%E2%89%A5%2022-brightgreen) ![dsh](https://img.shields.io/badge/dsh-web%20profile-orange) ![runtime](https://img.shields.io/badge/runtime-your%20own%20endpoint-brightgreen) ![tests](https://img.shields.io/badge/tests-146%20passing-brightgreen)
 
 给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的视频生成插件：文生视频、以一张图作为起始帧的图生视频、在对话里直接播放的片段、实时进度，以及取消——对着**你自己的** OpenAI 风格异步视频 API。不绑定任何厂商；端点在设置里添加。
 
@@ -39,20 +39,25 @@
 
 ## 安装
 
-> **包名是 `dsh-video-gen-plugin`。** npm 上这个名字还没人占，但目前尚未发布——本仓库把自己的构建产物作为 release 附件发布，所以按 URL 或路径安装。不要用 `dsh plugin add dsh-video-gen`：注册表上的那个包是另一个插件（Yang-wudi 的 DashScope/Veo/Sora 工具）。
+```sh
+dsh plugin --profile web add dsh-video-gen-plugin
+dsh --profile web
+```
 
-**从最新 release 安装**——每个 release 都附带名为 `plugin.tgz` 的 tarball：
+这条命令走 npm。想把插件钉在某个 release 上，就装它的 tarball——每个 release 都附带 `plugin.tgz`：
 
 ```powershell
 cd C:\Users\<you>\.dsh\profiles\web
 pnpm add https://github.com/adithyanraj03/dsh-video-gen-plugin/releases/latest/download/plugin.tgz
 ```
 
-然后在该 profile 的 `package.json` 里把名字加进 `dsh.profile.bundles`，重启宿主：
+两种情况都必须让包同时出现在该 profile 的 **`dependencies` 与 `dsh.profile.bundles`** 里，并且重启宿主，工具与路由才会注册：
 
 ```json
 "dsh": { "profile": { "bundles": ["dsh-video-gen-plugin"] } }
 ```
+
+> 要装的是 `dsh-video-gen-plugin`，不是 `dsh-video-gen`：后者是另一个插件（Yang-wudi 的 DashScope/Veo/Sora 工具），与本项目无关。
 
 **从本地检出安装**（本仓库自己的开发方式）：
 
@@ -72,7 +77,7 @@ pnpm install --dir C:\Users\<you>\.dsh\profiles\web
 
 **在桌面版里**——设置 → **插件** → **添加插件**，粘贴仓库地址（`https://github.com/adithyanraj03/dsh-video-gen-plugin`）。目前已安装的插件不会自动更新：升级要卸载后再装一次。
 
-一个 profile 只能加载一份。tarball 装好的同时链接行还在，插件会被启动两次。
+一个 profile 只能加载一份。包已经装好、链接行（或 tarball 行）还在的话，插件会被启动两次。
 
 ## 配置：添加端点
 

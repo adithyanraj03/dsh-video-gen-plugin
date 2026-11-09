@@ -14,7 +14,7 @@ Video generation for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-
 
 [View on GitHub](https://github.com/adithyanraj03/dsh-video-gen-plugin){: .btn }
 
-![language](https://img.shields.io/badge/language-typescript-3178c6) ![license](https://img.shields.io/badge/license-Apache--2.0-blue) ![node](https://img.shields.io/badge/node-%E2%89%A5%2022-brightgreen) ![dsh](https://img.shields.io/badge/dsh-web%20profile-orange) ![runtime](https://img.shields.io/badge/runtime-your%20own%20endpoint-brightgreen) ![tests](https://img.shields.io/badge/tests-146%20passing-brightgreen)
+![npm](https://img.shields.io/npm/v/dsh-video-gen-plugin) ![language](https://img.shields.io/badge/language-typescript-3178c6) ![license](https://img.shields.io/badge/license-Apache--2.0-blue) ![node](https://img.shields.io/badge/node-%E2%89%A5%2022-brightgreen) ![dsh](https://img.shields.io/badge/dsh-web%20profile-orange) ![runtime](https://img.shields.io/badge/runtime-your%20own%20endpoint-brightgreen) ![tests](https://img.shields.io/badge/tests-146%20passing-brightgreen)
 
 ---
 
@@ -38,25 +38,32 @@ The plugin ships with **no endpoint configured**. The first thing you see is the
 
 ## Install
 
-Install by tarball, not by name: the package is `dsh-video-gen-plugin`, and nothing is on npm yet — `dsh-video-gen` there is a different plugin.
+```sh
+dsh plugin --profile web add dsh-video-gen-plugin
+dsh --profile web
+```
+
+That resolves through npm. To pin one release instead, install its tarball — every release carries `plugin.tgz`:
 
 ```powershell
 cd C:\Users\<you>\.dsh\profiles\web
 pnpm add https://github.com/adithyanraj03/dsh-video-gen-plugin/releases/latest/download/plugin.tgz
 ```
 
-Then add the name to `dsh.profile.bundles` in that profile's `package.json` and restart the host:
+Either way the package must end up in the profile's `dsh.profile.bundles`, and the host has to restart for the tools and routes to register:
 
 ```json
 "dsh": { "profile": { "bundles": ["dsh-video-gen-plugin"] } }
 ```
+
+> Install `dsh-video-gen-plugin`, not `dsh-video-gen` — the latter is a different plugin.
 
 From a local checkout instead:
 
 ```powershell
 pnpm install
 pnpm run build
-# link it into the profile's dependencies and add "dsh-video-gen" to its bundles
+# link it into the profile's dependencies and add "dsh-video-gen-plugin" to its bundles
 pnpm install --dir C:\Users\<you>\.dsh\profiles\web
 ```
 

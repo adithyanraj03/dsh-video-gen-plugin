@@ -11,7 +11,7 @@ English | [中文](README.zh.md)
 
 Video generation for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): text-to-video, image-to-video from a start frame, a clip that plays in the conversation, live progress, and cancel — against **your own** OpenAI-style asynchronous video API. No vendor is baked in; you add endpoints in Settings.
 
-![language](https://img.shields.io/badge/language-typescript-3178c6) ![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg) ![node](https://img.shields.io/badge/node-%E2%89%A5%2022-brightgreen) ![dsh](https://img.shields.io/badge/dsh-web%20profile-orange) ![runtime](https://img.shields.io/badge/runtime-your%20own%20endpoint-brightgreen) ![tests](https://img.shields.io/badge/tests-146%20passing-brightgreen)
+![npm](https://img.shields.io/npm/v/dsh-video-gen-plugin) ![language](https://img.shields.io/badge/language-typescript-3178c6) ![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg) ![node](https://img.shields.io/badge/node-%E2%89%A5%2022-brightgreen) ![dsh](https://img.shields.io/badge/dsh-web%20profile-orange) ![runtime](https://img.shields.io/badge/runtime-your%20own%20endpoint-brightgreen) ![tests](https://img.shields.io/badge/tests-146%20passing-brightgreen)
 
 ## What it does
 
@@ -39,20 +39,25 @@ The plugin ships with **no endpoint configured**. That is deliberate: it is publ
 
 ## Install
 
-> **The package is `dsh-video-gen-plugin`.** That name is free on npm, but nothing is published there yet — this repo ships its own build as a release tarball, so install it by URL or by path. Do not run `dsh plugin add dsh-video-gen`: that package on the registry is a different plugin (Yang-wudi's DashScope/Veo/Sora tool).
+```sh
+dsh plugin --profile web add dsh-video-gen-plugin
+dsh --profile web
+```
 
-**From the latest release** — the tarball is attached to every release as `plugin.tgz`:
+That resolves through npm. To pin the plugin to one release instead, install its tarball — every release carries `plugin.tgz`:
 
 ```powershell
 cd C:\Users\<you>\.dsh\profiles\web
 pnpm add https://github.com/adithyanraj03/dsh-video-gen-plugin/releases/latest/download/plugin.tgz
 ```
 
-Then add the name to `dsh.profile.bundles` in that profile's `package.json` and restart the host:
+Either way the package must end up in **both** `dependencies` and `dsh.profile.bundles` of that profile's `package.json`, and the host has to restart for the tools and routes to register:
 
 ```json
 "dsh": { "profile": { "bundles": ["dsh-video-gen-plugin"] } }
 ```
+
+> Install the name `dsh-video-gen-plugin`, not `dsh-video-gen`: the latter is a different plugin (Yang-wudi's DashScope/Veo/Sora tool) and unrelated to this one.
 
 **From a local checkout** (what this repo's own development uses):
 
@@ -72,7 +77,7 @@ pnpm install --dir C:\Users\<you>\.dsh\profiles\web
 
 **In the desktop app** — Settings → **Plugins** → **Add plugin**, then paste the repository address (`https://github.com/adithyanraj03/dsh-video-gen-plugin`). Installed plugins do not update themselves yet: uninstall and install again to upgrade.
 
-A profile must load exactly one copy. Installing the tarball while the link row is still there boots the plugin twice.
+A profile must load exactly one copy. Installing the package while the link row (or a tarball row) is still there boots the plugin twice.
 
 ## Configure: add an endpoint
 
