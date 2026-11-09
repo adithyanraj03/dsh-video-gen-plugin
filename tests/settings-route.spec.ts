@@ -41,7 +41,7 @@ const ports = {
 
 describe('serveModels', () => {
   it('lists the models of an endpoint using the stored key', async () => {
-    const api = await endpoint(() => ({ status: 200, body: { data: [{ id: 'ltx-2.5', type: 'video' }, { id: 'other', type: 'image' }] } }))
+    const api = await endpoint(() => ({ status: 200, body: { data: [{ id: 'video-model', type: 'video' }, { id: 'other', type: 'image' }] } }))
     const base = await harness((req, res) => serveModels(req, res, { resolveKey: async () => 'token' }))
     const response = await fetch(`${base}/models`, {
       method: 'POST',
@@ -51,7 +51,7 @@ describe('serveModels', () => {
     expect(response.status).toBe(200)
     const body = await response.json() as { ok: boolean; models: string[] }
     expect(body.ok).toBe(true)
-    expect(body.models).toEqual(['ltx-2.5'])
+    expect(body.models).toEqual(['video-model'])
   })
 
   it('uses a key the caller just pasted, before it is stored', async () => {
@@ -154,3 +154,4 @@ describe('serveCredential', () => {
     expect(response.status).toBe(403)
   })
 })
+

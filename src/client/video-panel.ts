@@ -1,6 +1,5 @@
 /**
- * The NInfer "video being made" panel, self-contained, ported from the NInfer
- * Monitor (`ninfer_monitor/web/ui-video.js`; spec in `vid-gen-panel.md`).
+ * The "video being made" sheet, self-contained.
  *
  * One WebGL pass draws the whole sheet: ripples that start at uneven times and
  * places and bend everything on the sheet, its words included; smoke that
@@ -17,7 +16,7 @@
 /** Length of the first-frame reveal wave, in milliseconds. */
 const REVEAL_MS = 2800
 
-/** NInfer `/v1/videos` job answer, the shape the panel understands. */
+/** The async video job answer, the shape the sheet understands. */
 export interface PanelJob {
   status?: string
   progress?: number
@@ -51,7 +50,7 @@ export interface VideoPanelHandle {
   destroy(): void
 }
 
-/** Plain words for the engine's steps, as NInfer's page shows them. */
+/** Plain words for the engine's steps. */
 export function friendlyStage(job: PanelJob | undefined): string {
   const raw = String((job && job.stage) || '')
   if (job && job.status === 'queued') {
@@ -59,8 +58,8 @@ export function friendlyStage(job: PanelJob | undefined): string {
   }
   const rules: Array<[RegExp, string]> = [
     [/pausing the language model|letting the running chat/i, 'Pausing the language model'],
-    [/starting the LTX server|waiting for its turn/i, 'Starting the video engine'],
-    [/loading the LTX|Load (CLIP|VAE|Diffusion|Checkpoint|Upscale|Latent)|Queued in the engine|Empty|Math Expression|Frame Rate|Duration|Height|Width/i, 'Loading the models'],
+    [/starting .{0,24}server|waiting for its turn/i, 'Starting the video engine'],
+    [/loading .{0,24}models?|Load (CLIP|VAE|Diffusion|Checkpoint|Upscale|Latent)|Queued in the engine|Empty|Math Expression|Frame Rate|Duration|Height|Width/i, 'Loading the models'],
     [/CLIP Text|Text Encode|Enhanc/i, 'Reading the prompt'],
     [/Sampler|KSampler|Guider|Sigma|Scheduler|Noise/i, 'Generating the frames'],
     [/Upsampl|Upscal/i, 'Sharpening the frames'],
@@ -72,7 +71,7 @@ export function friendlyStage(job: PanelJob | undefined): string {
   return raw || 'Generating'
 }
 
-/** One plain-text log line for a job, NInfer's "thinking" format. */
+/** One plain-text log line for a job, in the log's own format. */
 export function describeJob(job: PanelJob | undefined): string {
   if (!job) return 'creating the job'
   if (job.status === 'queued') return 'waiting for its turn' + (job.queue_position ? ' (position ' + String(job.queue_position) + ')' : '')
@@ -92,8 +91,8 @@ export function secondsLabel(ms: number): string {
 
 /**
  * Map one of this plugin's job snapshots (as `JOBS_ROUTE` reports them) onto
- * the NInfer job shape the panel understands. `createdAt` is epoch
- * milliseconds here and epoch seconds in the NInfer answer.
+ * the job shape the sheet understands. `createdAt` is epoch
+ * milliseconds here and epoch seconds on the wire.
  */
 export function toPanelJob(snapshot: {
   status: string
@@ -573,3 +572,9 @@ export function createVideoPanel(container: HTMLElement, options?: VideoPanelOpt
     },
   }
 }
+
+
+
+
+
+

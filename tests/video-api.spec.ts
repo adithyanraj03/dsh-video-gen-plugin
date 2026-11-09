@@ -22,13 +22,13 @@ const reference = {
 
 describe('buildCreateBody', () => {
   it('sends seconds as the string the server echoes back', () => {
-    const body = buildCreateBody({ model: 'ltx-2.5', prompt: 'a cat surfing', seconds: 5 })
-    expect(body).toMatchObject({ model: 'ltx-2.5', prompt: 'a cat surfing', seconds: '5' })
+    const body = buildCreateBody({ model: 'video-model', prompt: 'a cat surfing', seconds: 5 })
+    expect(body).toMatchObject({ model: 'video-model', prompt: 'a cat surfing', seconds: '5' })
   })
 
   it('carries every optional field it was given and nothing else', () => {
     const body = buildCreateBody({
-      model: 'ltx-2.5', prompt: 'p', seconds: 8, size: '1280x704', orientation: 'landscape',
+      model: 'video-model', prompt: 'p', seconds: 8, size: '1280x704', orientation: 'landscape',
       fps: 24, seed: 7, enhance: true, negativePrompt: ' no text ',
     })
     expect(body).toMatchObject({
@@ -38,11 +38,11 @@ describe('buildCreateBody', () => {
   })
 
   it('refuses an empty prompt with an actionable message', () => {
-    expect(() => buildCreateBody({ model: 'ltx-2.5', prompt: '   ' })).toThrow(/non-empty prompt/)
+    expect(() => buildCreateBody({ model: 'video-model', prompt: '   ' })).toThrow(/non-empty prompt/)
   })
 
   it('refuses a prompt beyond the server limit', () => {
-    expect(() => buildCreateBody({ model: 'ltx-2.5', prompt: 'x'.repeat(8001) })).toThrow(/documented limit is 8000/)
+    expect(() => buildCreateBody({ model: 'video-model', prompt: 'x'.repeat(8001) })).toThrow(/documented limit is 8000/)
   })
 
   it('refuses seconds and fps outside the documented windows', () => {
@@ -58,11 +58,11 @@ describe('reference payloads', () => {
   })
 
   it('puts the picture in the multipart input_reference part', async () => {
-    const form = buildReferenceForm({ model: 'ltx-2.5', prompt: 'p', seconds: '5' }, reference)
+    const form = buildReferenceForm({ model: 'video-model', prompt: 'p', seconds: '5' }, reference)
     const part = form.get('input_reference')
     expect(part).toBeInstanceOf(Blob)
     expect((part as Blob).type).toBe('image/png')
-    expect(form.get('model')).toBe('ltx-2.5')
+    expect(form.get('model')).toBe('video-model')
     expect(form.get('input_reference')).not.toBeNull()
   })
 })
@@ -152,7 +152,7 @@ describe('createVideo', () => {
   it('posts JSON when there is no start frame', async () => {
     const fake = fakeFetch(() => new Response(JSON.stringify({ id: 'video_a', status: 'queued' }), { status: 200 }))
     const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
-    const job = await createVideo(client, { model: 'ltx-2.5', prompt: 'p', seconds: 5 })
+    const job = await createVideo(client, { model: 'video-model', prompt: 'p', seconds: 5 })
     expect(job.id).toBe('video_a')
     const call = fake.calls[0]!
     expect(call.url).toBe('https://video.test/v1/videos')
@@ -164,7 +164,7 @@ describe('createVideo', () => {
   it('posts multipart when a first frame is supplied', async () => {
     const fake = fakeFetch(() => new Response(JSON.stringify({ id: 'video_b', status: 'queued', from_picture: true }), { status: 200 }))
     const client = createClient({ baseURL: 'https://video.test/v1', token: 't', fetchFn: fake.fetchFn })
-    const job = await createVideo(client, { model: 'ltx-2.5', prompt: 'p', seconds: 5 }, { reference })
+    const job = await createVideo(client, { model: 'video-model', prompt: 'p', seconds: 5 }, { reference })
     expect(job.fromPicture).toBe(true)
     const call = fake.calls[0]!
     expect(call.init?.body).toBeInstanceOf(FormData)
@@ -235,3 +235,4 @@ describe('pollDelay', () => {
     expect(pollDelay(9, 20000)).toBe(30000)
   })
 })
+

@@ -156,7 +156,7 @@ describe('serveJobs', () => {
   it('lists the jobs it is given, capped and uncached', async () => {
     const base = await serve((req, res) => serveJobs(req, res, {
       list: limit => Array.from({ length: Math.min(limit ?? 10, 3) }, (_, index) => ({
-        id: `video_${String(index)}`, model: 'ltx-2.5', prompt: 'p', status: 'completed' as const,
+        id: `video_${String(index)}`, model: 'video-model', prompt: 'p', status: 'completed' as const,
         progress: 100, seconds: 5, size: '1280x704', fromPicture: false, createdAt: 1, updatedAt: 2,
       })),
     }))
@@ -167,3 +167,4 @@ describe('serveJobs', () => {
     expect(body.jobs).toHaveLength(2)
   })
 })
+

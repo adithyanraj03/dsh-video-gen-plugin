@@ -1,6 +1,6 @@
 /**
  * Inline video result card. While a job is queued or rendering the card draws
- * the NInfer "being made" sheet (ripples, plain-words stage, percent, time,
+ * the "being made" sheet (ripples, plain-words stage, percent, time,
  * progress bar) with a cancel button and a heartbeat log line; when the clip
  * is ready the sheet ripples its first frame in and a `<video>` player takes
  * over on that frame. Failures grey the sheet with the reason.
@@ -314,10 +314,10 @@ export function useJobProgress(jobId: string | undefined, initial: VideoJobView 
 }
 
 /**
- * The NInfer sheet for one job. The panel module owns every pixel inside the
+ * The sheet for one job. The panel module owns every pixel inside the
  * host div: the water while rendering, the grey sheet on failure, and the
- * `<video>` player after the reveal wave settles. `autoplay` mirrors NInfer's
- * rule: a fresh `generate_video` plays; re-opening a finished job stays paused
+ * `<video>` player after the reveal wave settles. `autoplay` mirrors the design:
+ * a fresh `generate_video` plays; re-opening a finished job stays paused
  * on its first frame. `jobId` may be undefined while the sheet is driven by
  * the call arguments (the tool is still running); the reveal waits for the
  * id the live lookup or the result supplies.
@@ -399,7 +399,7 @@ function MetaRow({ job, meta, lang, cancelling, canCancel, onCancel }: {
   )
 }
 
-/** The spinner + `Processing…` row, with the model chip, as NInfer's page shows it. */
+/** The spinner + `Processing…` row, with the model chip. */
 function ProcessingRow({ job, meta, lang }: { job: VideoJobView | undefined; meta: VideoMeta; lang: Lang }): JSX.Element {
   const text = TEXT[lang]
   const model = job?.model ?? meta.model ?? ''
@@ -436,7 +436,7 @@ function MediaLine({ meta, lang }: { meta: VideoMeta; lang: Lang }): JSX.Element
   return <div style={STYLE.meta}>{parts.join(' · ')}</div>
 }
 
-/** The single-job card: sheet or player, the NInfer rows while running, and detail. */
+/** The single-job card: sheet or player, the status rows while running, and detail. */
 function VideoCardView({ meta, lang, note }: { meta: VideoMeta; lang: Lang; note?: string | undefined }) {
   const text = TEXT[lang]
   const jobId = meta.jobId
@@ -616,7 +616,7 @@ export interface VideoResultNodeProps {
 }
 
 /**
- * Conversation node view: every promoted result renders the full NInfer card
+ * Conversation node view: every promoted result renders the full card
  * as final output — the water sheet with live progress while the job runs and
  * the ripple reveal when the clip lands.
  */
@@ -655,3 +655,10 @@ export function videoMetaFromPresentation(result: VideoResultPresentation): Vide
 export function languageOf(snapshot: { active?: string | undefined } | undefined): Lang {
   return snapshot?.active?.toLowerCase().startsWith('zh') === true ? 'zh' : 'en'
 }
+
+
+
+
+
+
+

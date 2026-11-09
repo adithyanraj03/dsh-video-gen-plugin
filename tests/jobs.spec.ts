@@ -7,7 +7,7 @@ import type { VideoApiClient } from '../src/video-api.js'
 import type { VideoJobRecord } from '../src/shared.js'
 
 const record = (overrides: Partial<VideoJobRecord> = {}): VideoJobRecord => ({
-  id: 'video_abc', provider: 'ninfer', model: 'ltx-2.5', prompt: 'a cat surfing', status: 'in_progress',
+  id: 'video_abc', provider: 'video', model: 'video-model', prompt: 'a cat surfing', status: 'in_progress',
   progress: 10, seconds: 5, size: '1280x704', enhance: false, fromPicture: false,
   createdAt: 1_000, updatedAt: 1_000, ...overrides,
 })
@@ -85,7 +85,7 @@ describe('VideoJobStore', () => {
     const dir = await mkdtemp(join(tmpdir(), 'video-jobs-'))
     const { client } = fakeClient(['queued', 'in_progress', 'completed'])
     const store = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
-    const submitted = await store.submit({ model: 'ltx-2.5', prompt: 'a cat surfing', seconds: 5, size: '1280x704', enhance: false })
+    const submitted = await store.submit({ model: 'video-model', prompt: 'a cat surfing', seconds: 5, size: '1280x704', enhance: false })
     expect(submitted.id).toBe('video_abc')
 
     const outcome = await store.waitFor('video_abc', 5_000)
@@ -110,7 +110,7 @@ describe('VideoJobStore', () => {
     const dir = await mkdtemp(join(tmpdir(), 'video-jobs-'))
     const { client } = fakeClient(['failed'])
     const store = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
-    await store.submit({ model: 'ltx-2.5', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
+    await store.submit({ model: 'video-model', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
     const outcome = await store.waitFor('video_abc', 5_000)
     expect(outcome.record.status).toBe('failed')
     expect(outcome.record.error).toMatch(/shorter clip|fewer seconds|timed out/)
@@ -120,7 +120,7 @@ describe('VideoJobStore', () => {
     const dir = await mkdtemp(join(tmpdir(), 'video-jobs-'))
     const { client } = fakeClient(['in_progress', 'completed'])
     const store = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
-    await store.submit({ model: 'ltx-2.5', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
+    await store.submit({ model: 'video-model', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
     const outcome = await store.waitFor('video_abc', 0)
     expect(outcome.timedOut).toBe(true)
     expect(outcome.record.status).not.toBe('completed')
@@ -130,7 +130,7 @@ describe('VideoJobStore', () => {
     const dir = await mkdtemp(join(tmpdir(), 'video-jobs-'))
     const { client } = fakeClient(['in_progress'])
     const store = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
-    await store.submit({ model: 'ltx-2.5', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
+    await store.submit({ model: 'video-model', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
     const cancelled = await store.cancel('video_abc')
     expect(cancelled.status).toBe('cancelled')
     await expect(store.cancel('video_unknown')).rejects.toThrow(/unknown to this host/)
@@ -162,7 +162,7 @@ describe('VideoJobStore', () => {
         return { ...finished, savedTo: join(dir, 'copy.mp4') }
       },
     })
-    await store.submit({ model: 'ltx-2.5', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
+    await store.submit({ model: 'video-model', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
     const outcome = await store.waitFor('video_abc', 5_000)
     expect(calls).toBe(1)
     expect(outcome.record.savedTo).toBe(join(dir, 'copy.mp4'))
@@ -176,7 +176,7 @@ describe('VideoJobStore', () => {
     await writeFile(join(dir, 'jobs.json'), JSON.stringify({ version: 1, jobs: [foreign] }))
 
     const store = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
-    await store.submit({ model: 'ltx-2.5', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
+    await store.submit({ model: 'video-model', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
     await store.waitFor('video_abc', 5_000)
 
     const history = JSON.parse(await readFile(join(dir, 'jobs.json'), 'utf8')) as { jobs: VideoJobRecord[] }
@@ -190,14 +190,15 @@ describe('VideoJobStore', () => {
     const dir = await mkdtemp(join(tmpdir(), 'video-jobs-'))
     const { client } = fakeClient(['completed'])
     const first = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
-    await first.submit({ model: 'ltx-2.5', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
+    await first.submit({ model: 'video-model', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
     await first.waitFor('video_abc', 5_000)
 
     // A second process starts cold and writes before reading: the merge keeps the clip.
     const second = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
-    await second.submit({ model: 'ltx-2.5', prompt: 'q', seconds: 5, size: '1280x704', enhance: false })
+    await second.submit({ model: 'video-model', prompt: 'q', seconds: 5, size: '1280x704', enhance: false })
     const history = JSON.parse(await readFile(join(dir, 'jobs.json'), 'utf8')) as { jobs: VideoJobRecord[] }
     expect(history.jobs.some(job => job.id === 'video_abc')).toBe(true)
     expect(history.jobs.length).toBeGreaterThan(0)
   })
 })
+

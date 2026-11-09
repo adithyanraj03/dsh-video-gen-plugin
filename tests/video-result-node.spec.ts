@@ -13,7 +13,7 @@ const meta = (overrides: Record<string, unknown> = {}): Record<string, unknown> 
   jobId: 'video_1a2b3c4d5e6f',
   status: 'completed',
   prompt: 'a robot docks in for the night shift',
-  model: 'ltx-2',
+  model: 'video-model',
   seconds: 5,
   size: '1280x704',
   createdAt: 19700121182333000,
@@ -238,3 +238,4 @@ describe('videoMetaFromPresentation', () => {
     })
   })
 })
+

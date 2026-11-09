@@ -19,9 +19,11 @@ Video generation for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-
 | Start frame | Pass `image_url`, `source_attachment_id` (an image already in the chat), or `source_path` (a file in the session workspace). That picture becomes the clip's **first frame**. |
 | `check_video` | One job by id, or the recent list. Also adopts a job id this host never saw by asking the server. |
 | `cancel_video` | Stops a queued or running render so the GPU frees up. |
-| Tool card | The finished MP4 plays inline with native controls and seeks via `Range` requests; while rendering, the card shows the NInfer "being made" sheet — ripples, plain-words stage, percent, and time — with a cancel button, and ripples the first frame in when the clip is ready. |
+| Tool card | The finished MP4 plays inline with native controls and seeks via `Range` requests; while rendering, the card shows a "being made" sheet — ripples, plain-words stage, percent, and time — with a cancel button, and ripples the first frame in when the clip is ready. |
 
-![The card while a clip renders](assets/card-rendering.png)
+![The sheet rippling into the finished clip](assets/reveal.gif)
+
+![The sheet while a clip renders](assets/card-rendering.png)
 
 Long renders do not hold the conversation: `generate_video` waits for `waitGraceMs` (default 2 minutes) and then returns the job id. Use `wait: "until_done"` to block for the whole render, or `wait: "none"` to return immediately.
 
@@ -162,8 +164,9 @@ Layout: `src/*.ts` is the host fiber (`index.ts` registers the tools and routes)
 
 | dsh-video-gen | DeepSeek Harness | Notes |
 | --- | --- | --- |
+| 0.2.2 | 0.1.7-rc.2 | Cleanup for the public release: vendor-specific names are out of the source, the tests and the README, and the stage matcher now starts any engine name rather than one vendor's. The README gains the banner, the badge row and a GIF of the reveal. |
 | 0.2.1 | 0.1.7-rc.2 | The sheet now also renders during the `generate_video` wait grace, tracking the real job through the host's own selection rule (prompt match, else a single active job), so percent and stage move instead of freezing at 0%; the water/ripples/words actually draw, the words follow every poll (they live in the sheet texture), and a progress log under the sheet keeps one line per distinct engine answer; a settled generate result is promoted to a session-located chat row (kind `dsh-video-result`) that appears while the turn is still running and survives Tool-process folding; clip history is written merge-safe and the clip routes fall back to the job id's file suffix, so a restart or a second host sharing the folder no longer leaves old clips unplayable. |
-| 0.2.0 | 0.1.7-rc.2 | NInfer "being made" sheet, first-frame reveal, and cancel button in the render card; `check_video` with one job shows the same card; `createdAt` (epoch ms) on the tool output. |
+| 0.2.0 | 0.1.7-rc.2 | The "being made" sheet, first-frame reveal, and cancel button in the render card; `check_video` with one job shows the same card; `createdAt` (epoch ms) on the tool output. |
 | 0.1.0 | 0.1.7-rc.2 | Settings card renders on `plugins.bundle.config`; the legacy `settings.plugin.item` seat is kept for hosts at or below 0.1.5. Schema uses the 0.1.7 volatile form with the `installSection` relay as fallback. |
 
 ## License

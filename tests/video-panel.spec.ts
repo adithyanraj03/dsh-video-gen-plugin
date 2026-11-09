@@ -16,7 +16,7 @@ describe('friendlyStage', () => {
   it('translates the engine start-up stages', () => {
     expect(friendlyStage({ stage: 'pausing the language model (qwen3)' })).toBe('Pausing the language model')
     expect(friendlyStage({ stage: 'letting the running chat finish' })).toBe('Pausing the language model')
-    expect(friendlyStage({ stage: 'starting the LTX server' })).toBe('Starting the video engine')
+    expect(friendlyStage({ stage: 'starting the video server' })).toBe('Starting the video engine')
     expect(friendlyStage({ stage: 'waiting for its turn' })).toBe('Starting the video engine')
   })
 
@@ -49,7 +49,7 @@ describe('friendlyStage', () => {
 })
 
 describe('describeJob', () => {
-  it('names the states in the NInfer log format', () => {
+  it('names the states in the log format', () => {
     expect(describeJob(undefined)).toBe('creating the job')
     expect(describeJob({ status: 'queued', queue_position: 3 })).toBe('waiting for its turn (position 3)')
     expect(describeJob({ status: 'queued' })).toBe('waiting for its turn')
@@ -82,7 +82,7 @@ describe('secondsLabel', () => {
 })
 
 describe('toPanelJob', () => {
-  it('maps the browser snapshot onto the NInfer job shape', () => {
+  it('maps the browser snapshot onto the job shape', () => {
     expect(toPanelJob({
       status: 'in_progress',
       progress: 42,
@@ -119,3 +119,4 @@ describe('module import', () => {
     expect(typeof createVideoPanel).toBe('function')
   })
 })
+

@@ -133,7 +133,7 @@ describe('renderers', () => {
     const { renderVideoResult } = module
     const text = renderVideoResult({
       jobId: 'video_abc', status: 'completed', progress: 100, prompt: 'a cat surfing',
-      model: 'ltx-2.5', seconds: 5, size: '1280x704', fromPicture: false, waitedMs: 42_000,
+      model: 'video-model', seconds: 5, size: '1280x704', fromPicture: false, waitedMs: 42_000,
       savedTo: 'C:\\ws\\videos\\clip.mp4', videoPath: 'C:\\dsh\\clip.mp4',
     })
     expect(text).toMatch(/Video ready/)
@@ -145,10 +145,11 @@ describe('renderers', () => {
   it('describe a running clip with the follow-up tool', async () => {
     const { renderVideoResult } = await import('../src/index.js')
     const text = renderVideoResult({
-      jobId: 'video_abc', status: 'in_progress', progress: 40, prompt: 'p', model: 'ltx-2.5',
+      jobId: 'video_abc', status: 'in_progress', progress: 40, prompt: 'p', model: 'video-model',
       seconds: 5, size: '1280x704', fromPicture: true, waitedMs: 0, queuePosition: 1, stage: 'render',
     })
     expect(text).toMatch(/still in_progress/)
     expect(text).toMatch(/check_video/)
   })
 })
+

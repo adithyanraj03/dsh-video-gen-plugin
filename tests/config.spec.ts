@@ -29,7 +29,7 @@ function plain(source: unknown): ConfigShape {
 const resolved = (input: unknown): ConfigShape => plain(Config(input as never))
 
 const endpoint = (overrides: Record<string, unknown> = {}) => ({
-  id: 'host-a', label: 'Host A', baseUrl: 'https://video.test/v1', model: 'ltx-2.5', apiKeyRef: '',
+  id: 'host-a', label: 'Host A', baseUrl: 'https://video.test/v1', model: 'video-model', apiKeyRef: '',
   ...overrides,
 })
 
@@ -51,7 +51,7 @@ describe('Config schema', () => {
     const config = resolved({ connections: [endpoint({ seconds: 8, size: '1080p' })] })
     const rows = usableConnections(config)
     expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ id: 'host-a', baseUrl: 'https://video.test/v1', model: 'ltx-2.5', seconds: 8, size: '1080p' })
+    expect(rows[0]).toMatchObject({ id: 'host-a', baseUrl: 'https://video.test/v1', model: 'video-model', seconds: 8, size: '1080p' })
   })
 
   it('marks every field volatile, which the 0.1.7 settings form needs', () => {
@@ -76,7 +76,7 @@ describe('resolveVideoTarget', () => {
       connectionId: 'host-a',
       label: 'Host A',
       baseURL: 'https://video.test/v1',
-      model: 'ltx-2.5',
+      model: 'video-model',
       keyRef: 'VIDEO_GEN_KEY_HOST_A',
       pollIntervalMs: 3_000,
       waitGraceMs: 120_000,
@@ -159,3 +159,4 @@ describe('tool names', () => {
     expect(toolNames(resolved({ toolNameSet: 'prefixed' }))).toEqual(prefixed)
   })
 })
+
