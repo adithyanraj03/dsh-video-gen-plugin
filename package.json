@@ -1,6 +1,6 @@
 {
-  "name": "dsh-video-gen",
-  "version": "0.2.2",
+  "name": "dsh-video-gen-plugin",
+  "version": "0.3.0",
   "description": "Bring-your-own video endpoint for DeepSeek Harness: text-to-video and image-to-video with inline playback, live progress, and cancel.",
   "type": "module",
   "author": "Adithya N Raj",
@@ -9,12 +9,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/adithyanraj03/dsh-video-gen.git"
+    "url": "git+https://github.com/adithyanraj03/dsh-video-gen-plugin.git"
   },
   "bugs": {
-    "url": "https://github.com/adithyanraj03/dsh-video-gen/issues"
+    "url": "https://github.com/adithyanraj03/dsh-video-gen-plugin/issues"
   },
-  "homepage": "https://github.com/adithyanraj03/dsh-video-gen#readme",
+  "homepage": "https://github.com/adithyanraj03/dsh-video-gen-plugin#readme",
   "icon": "assets/icon.png",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

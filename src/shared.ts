@@ -7,19 +7,19 @@ export const VIDEO_GENERATION_ENTRY_ID = 'video-gen'
 export const VIDEO_GENERATION_NAMESPACE = 'video-generation'
 
 /** Same-origin route streaming one generated MP4; supports Range requests. */
-export const VIDEO_ROUTE = '/plugins/dsh-video-gen/video'
+export const VIDEO_ROUTE = '/plugins/dsh-video-gen-plugin/video'
 /** Same-origin route serving the stored middle-frame JPEG. */
-export const THUMB_ROUTE = '/plugins/dsh-video-gen/thumb'
+export const THUMB_ROUTE = '/plugins/dsh-video-gen-plugin/thumb'
 /** Same-origin route listing recent jobs; the toolview polls it for live progress. */
-export const JOBS_ROUTE = '/plugins/dsh-video-gen/jobs'
+export const JOBS_ROUTE = '/plugins/dsh-video-gen-plugin/jobs'
 /** Same-origin route cancelling one queued or running job. */
-export const CANCEL_ROUTE = '/plugins/dsh-video-gen/cancel'
+export const CANCEL_ROUTE = '/plugins/dsh-video-gen-plugin/cancel'
 /** Same-origin route probing one endpoint and listing its models (settings card). */
-export const MODELS_ROUTE = '/plugins/dsh-video-gen/models'
+export const MODELS_ROUTE = '/plugins/dsh-video-gen-plugin/models'
 /** Same-origin route storing and describing one API key reference. */
-export const CREDENTIAL_ROUTE = '/plugins/dsh-video-gen/credential'
+export const CREDENTIAL_ROUTE = '/plugins/dsh-video-gen-plugin/credential'
 /** Same-origin route probing the active endpoint (kept for compatibility). */
-export const TEST_CONNECTION_ROUTE = '/plugins/dsh-video-gen/test'
+export const TEST_CONNECTION_ROUTE = '/plugins/dsh-video-gen-plugin/test'
 
 /** Cap on how many endpoints one settings page may hold. */
 export const MAX_CONNECTIONS = 12
@@ -47,7 +47,7 @@ export function connectionSlug(label: string, taken: readonly string[] = []): st
   return `${base}-${String(Date.now())}`
 }
 /** Non-secret settings capability probe, served even when the host cannot build a form. */
-export const SETTINGS_HEALTH_ROUTE = '/plugins/dsh-video-gen/settings-health'
+export const SETTINGS_HEALTH_ROUTE = '/plugins/dsh-video-gen-plugin/settings-health'
 
 /** What the host's settings service can currently offer this plugin. */
 export interface SettingsHealth {

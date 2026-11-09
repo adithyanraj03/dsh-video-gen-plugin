@@ -39,19 +39,19 @@ The plugin ships with **no endpoint configured**. That is deliberate: it is publ
 
 ## Install
 
-> **The npm name is taken.** `dsh-video-gen` on the registry is a *different* plugin (Yang-wudi's DashScope/Veo/Sora tool), so `dsh plugin add dsh-video-gen` installs that one, not this. This repo ships its own build as a release tarball; install it by URL or by path.
+> **The package is `dsh-video-gen-plugin`.** That name is free on npm, but nothing is published there yet — this repo ships its own build as a release tarball, so install it by URL or by path. Do not run `dsh plugin add dsh-video-gen`: that package on the registry is a different plugin (Yang-wudi's DashScope/Veo/Sora tool).
 
 **From the latest release** — the tarball is attached to every release as `plugin.tgz`:
 
 ```powershell
 cd C:\Users\<you>\.dsh\profiles\web
-pnpm add https://github.com/adithyanraj03/dsh-video-gen/releases/latest/download/plugin.tgz
+pnpm add https://github.com/adithyanraj03/dsh-video-gen-plugin/releases/latest/download/plugin.tgz
 ```
 
 Then add the name to `dsh.profile.bundles` in that profile's `package.json` and restart the host:
 
 ```json
-"dsh": { "profile": { "bundles": ["dsh-video-gen"] } }
+"dsh": { "profile": { "bundles": ["dsh-video-gen-plugin"] } }
 ```
 
 **From a local checkout** (what this repo's own development uses):
@@ -65,12 +65,12 @@ Then link it into a profile and add it to that profile's bundles:
 
 ```powershell
 # C:\Users\<you>\.dsh\profiles\web\package.json
-#   "dependencies": { "dsh-video-gen": "link:B:/Research/dsh-video-gen" }
-#   "dsh": { "profile": { "bundles": ["dsh-video-gen", ...] } }
+#   "dependencies": { "dsh-video-gen-plugin": "link:B:/Research/dsh-video-gen" }
+#   "dsh": { "profile": { "bundles": ["dsh-video-gen-plugin", ...] } }
 pnpm install --dir C:\Users\<you>\.dsh\profiles\web
 ```
 
-**In the desktop app** — Settings → **Plugins** → **Add plugin**, then paste the repository address (`https://github.com/adithyanraj03/dsh-video-gen`). Installed plugins do not update themselves yet: uninstall and install again to upgrade.
+**In the desktop app** — Settings → **Plugins** → **Add plugin**, then paste the repository address (`https://github.com/adithyanraj03/dsh-video-gen-plugin`). Installed plugins do not update themselves yet: uninstall and install again to upgrade.
 
 A profile must load exactly one copy. Installing the tarball while the link row is still there boots the plugin twice.
 
@@ -131,14 +131,14 @@ Served same-origin by the plugin, gated by the harness connection trust decision
 
 | Route | Purpose |
 | --- | --- |
-| `/plugins/dsh-video-gen/video?job=<id>` | MP4 stream, `Range`/`ETag`/`304` aware. |
-| `/plugins/dsh-video-gen/thumb?job=<id>` | Stored middle-frame JPEG (poster). |
-| `/plugins/dsh-video-gen/jobs` | Recent job state the tool card polls while rendering. |
-| `/plugins/dsh-video-gen/cancel` | `POST { id }` to stop a job. |
-| `/plugins/dsh-video-gen/models` | `POST { baseUrl, apiKeyRef, keyValue? }` — probe one endpoint and list its models. |
-| `/plugins/dsh-video-gen/credential` | `GET ?ref=NAME` describes a key; `POST { ref, value }` stores it (blank removes). |
-| `/plugins/dsh-video-gen/test` | `POST` probe of the active endpoint. |
-| `/plugins/dsh-video-gen/settings-health` | Which settings generation the host serves. |
+| `/plugins/dsh-video-gen-plugin/video?job=<id>` | MP4 stream, `Range`/`ETag`/`304` aware. |
+| `/plugins/dsh-video-gen-plugin/thumb?job=<id>` | Stored middle-frame JPEG (poster). |
+| `/plugins/dsh-video-gen-plugin/jobs` | Recent job state the tool card polls while rendering. |
+| `/plugins/dsh-video-gen-plugin/cancel` | `POST { id }` to stop a job. |
+| `/plugins/dsh-video-gen-plugin/models` | `POST { baseUrl, apiKeyRef, keyValue? }` — probe one endpoint and list its models. |
+| `/plugins/dsh-video-gen-plugin/credential` | `GET ?ref=NAME` describes a key; `POST { ref, value }` stores it (blank removes). |
+| `/plugins/dsh-video-gen-plugin/test` | `POST` probe of the active endpoint. |
+| `/plugins/dsh-video-gen-plugin/settings-health` | Which settings generation the host serves. |
 
 ## Development
 

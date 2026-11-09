@@ -9,7 +9,7 @@ import { VIDEO_RESULT_NODE_KIND, createVideoResultDefinition } from './video-res
 export { VideoResultCard } from './video-toolview.js'
 export { VideoSettingsCard } from './settings-card.js'
 
-export const name = 'dsh-video-gen/client'
+export const name = 'dsh-video-gen-plugin/client'
 export const inject = ['slots', 'locale']
 
 /** Every tool name that renders the result card, including the prefixed family. */

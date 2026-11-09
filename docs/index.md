@@ -12,7 +12,7 @@ title: dsh-video-gen
 
 Video generation for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): text-to-video, image-to-video from a start frame, a clip that plays in the conversation, live progress, and cancel — against **your own** OpenAI-style asynchronous video API. No vendor is baked in; you add endpoints in Settings.
 
-[View on GitHub](https://github.com/adithyanraj03/dsh-video-gen){: .btn }
+[View on GitHub](https://github.com/adithyanraj03/dsh-video-gen-plugin){: .btn }
 
 ![language](https://img.shields.io/badge/language-typescript-3178c6) ![license](https://img.shields.io/badge/license-Apache--2.0-blue) ![node](https://img.shields.io/badge/node-%E2%89%A5%2022-brightgreen) ![dsh](https://img.shields.io/badge/dsh-web%20profile-orange) ![runtime](https://img.shields.io/badge/runtime-your%20own%20endpoint-brightgreen) ![tests](https://img.shields.io/badge/tests-146%20passing-brightgreen)
 
@@ -38,17 +38,17 @@ The plugin ships with **no endpoint configured**. The first thing you see is the
 
 ## Install
 
-Install by tarball, not by name: `dsh-video-gen` on the npm registry is a *different* plugin.
+Install by tarball, not by name: the package is `dsh-video-gen-plugin`, and nothing is on npm yet — `dsh-video-gen` there is a different plugin.
 
 ```powershell
 cd C:\Users\<you>\.dsh\profiles\web
-pnpm add https://github.com/adithyanraj03/dsh-video-gen/releases/latest/download/plugin.tgz
+pnpm add https://github.com/adithyanraj03/dsh-video-gen-plugin/releases/latest/download/plugin.tgz
 ```
 
 Then add the name to `dsh.profile.bundles` in that profile's `package.json` and restart the host:
 
 ```json
-"dsh": { "profile": { "bundles": ["dsh-video-gen"] } }
+"dsh": { "profile": { "bundles": ["dsh-video-gen-plugin"] } }
 ```
 
 From a local checkout instead:
@@ -60,7 +60,7 @@ pnpm run build
 pnpm install --dir C:\Users\<you>\.dsh\profiles\web
 ```
 
-In the desktop app: Settings → **Plugins** → **Add plugin**, paste `https://github.com/adithyanraj03/dsh-video-gen`.
+In the desktop app: Settings → **Plugins** → **Add plugin**, paste `https://github.com/adithyanraj03/dsh-video-gen-plugin`.
 
 ---
 
@@ -98,4 +98,4 @@ One endpoint per row, all calls bearer-authenticated:
 - One video API that speaks the shape above, plus its API key.
 - A web profile: the clip card, the progress poll, and the settings card use the harness web server.
 
-Apache-2.0. Full documentation, development notes and the release history live in the [repository](https://github.com/adithyanraj03/dsh-video-gen).
+Apache-2.0. Full documentation, development notes and the release history live in the [repository](https://github.com/adithyanraj03/dsh-video-gen-plugin).

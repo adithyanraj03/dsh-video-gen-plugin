@@ -39,19 +39,19 @@
 
 ## 安装
 
-> **npm 上的名字已被人占用。** 注册表里的 `dsh-video-gen` 是*另一个*插件（Yang-wudi 的 DashScope/Veo/Sora 工具），所以 `dsh plugin add dsh-video-gen` 装的是它，不是这个。本仓库把自己的构建产物作为 release 附件发布；请按 URL 或路径安装。
+> **包名是 `dsh-video-gen-plugin`。** npm 上这个名字还没人占，但目前尚未发布——本仓库把自己的构建产物作为 release 附件发布，所以按 URL 或路径安装。不要用 `dsh plugin add dsh-video-gen`：注册表上的那个包是另一个插件（Yang-wudi 的 DashScope/Veo/Sora 工具）。
 
 **从最新 release 安装**——每个 release 都附带名为 `plugin.tgz` 的 tarball：
 
 ```powershell
 cd C:\Users\<you>\.dsh\profiles\web
-pnpm add https://github.com/adithyanraj03/dsh-video-gen/releases/latest/download/plugin.tgz
+pnpm add https://github.com/adithyanraj03/dsh-video-gen-plugin/releases/latest/download/plugin.tgz
 ```
 
 然后在该 profile 的 `package.json` 里把名字加进 `dsh.profile.bundles`，重启宿主：
 
 ```json
-"dsh": { "profile": { "bundles": ["dsh-video-gen"] } }
+"dsh": { "profile": { "bundles": ["dsh-video-gen-plugin"] } }
 ```
 
 **从本地检出安装**（本仓库自己的开发方式）：
@@ -65,12 +65,12 @@ pnpm run build
 
 ```powershell
 # C:\Users\<you>\.dsh\profiles\web\package.json
-#   "dependencies": { "dsh-video-gen": "link:B:/Research/dsh-video-gen" }
-#   "dsh": { "profile": { "bundles": ["dsh-video-gen", ...] } }
+#   "dependencies": { "dsh-video-gen-plugin": "link:B:/Research/dsh-video-gen" }
+#   "dsh": { "profile": { "bundles": ["dsh-video-gen-plugin", ...] } }
 pnpm install --dir C:\Users\<you>\.dsh\profiles\web
 ```
 
-**在桌面版里**——设置 → **插件** → **添加插件**，粘贴仓库地址（`https://github.com/adithyanraj03/dsh-video-gen`）。目前已安装的插件不会自动更新：升级要卸载后再装一次。
+**在桌面版里**——设置 → **插件** → **添加插件**，粘贴仓库地址（`https://github.com/adithyanraj03/dsh-video-gen-plugin`）。目前已安装的插件不会自动更新：升级要卸载后再装一次。
 
 一个 profile 只能加载一份。tarball 装好的同时链接行还在，插件会被启动两次。
 
@@ -131,14 +131,14 @@ pnpm install --dir C:\Users\<you>\.dsh\profiles\web
 
 | 路由 | 用途 |
 | --- | --- |
-| `/plugins/dsh-video-gen/video?job=<id>` | MP4 流，支持 `Range`/`ETag`/`304`。 |
-| `/plugins/dsh-video-gen/thumb?job=<id>` | 存下的中间帧 JPEG（封面）。 |
-| `/plugins/dsh-video-gen/jobs` | 渲染过程中工具卡片轮询的近期任务状态。 |
-| `/plugins/dsh-video-gen/cancel` | `POST { id }` 停止任务。 |
-| `/plugins/dsh-video-gen/models` | `POST { baseUrl, apiKeyRef, keyValue? }`——探测一个端点并列出它的模型。 |
-| `/plugins/dsh-video-gen/credential` | `GET ?ref=NAME` 描述一个密钥；`POST { ref, value }` 保存（空值即删除）。 |
-| `/plugins/dsh-video-gen/test` | `POST` 探测当前端点。 |
-| `/plugins/dsh-video-gen/settings-health` | 宿主提供的是哪一代设置能力。 |
+| `/plugins/dsh-video-gen-plugin/video?job=<id>` | MP4 流，支持 `Range`/`ETag`/`304`。 |
+| `/plugins/dsh-video-gen-plugin/thumb?job=<id>` | 存下的中间帧 JPEG（封面）。 |
+| `/plugins/dsh-video-gen-plugin/jobs` | 渲染过程中工具卡片轮询的近期任务状态。 |
+| `/plugins/dsh-video-gen-plugin/cancel` | `POST { id }` 停止任务。 |
+| `/plugins/dsh-video-gen-plugin/models` | `POST { baseUrl, apiKeyRef, keyValue? }`——探测一个端点并列出它的模型。 |
+| `/plugins/dsh-video-gen-plugin/credential` | `GET ?ref=NAME` 描述一个密钥；`POST { ref, value }` 保存（空值即删除）。 |
+| `/plugins/dsh-video-gen-plugin/test` | `POST` 探测当前端点。 |
+| `/plugins/dsh-video-gen-plugin/settings-health` | 宿主提供的是哪一代设置能力。 |
 
 ## 开发
 
