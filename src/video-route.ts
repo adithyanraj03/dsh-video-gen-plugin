@@ -7,7 +7,7 @@
  * server has to answer `Range` requests.
  */
 import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { extname, resolve, sep } from 'node:path'
 import { safeFileName, type VideoJobView } from './shared.js'
@@ -198,6 +198,23 @@ export interface JobFileSource {
   get(id: string): { videoFile?: string; thumbFile?: string } | undefined
 }
 
+/**
+ * Find a stored clip by the job id's file suffix.
+ *
+ * Clip names are `video-<stamp>-<last 8 of the job id>`, so a job keeps its
+ * file addressable even when the history file no longer lists it (a second
+ * host sharing the directory can overwrite `jobs.json`). Only an unambiguous
+ * match is accepted, and only inside this plugin's own directory.
+ */
+async function fileForJobSuffix(dir: string, jobId: string, extension: '.mp4' | '.jpg'): Promise<string | undefined> {
+  const suffix = jobId.replace(/^video_/, '').slice(-8)
+  if (!/^[0-9a-f]{8}$/.test(suffix)) return undefined
+  const names = await readdir(dir).catch(() => [] as string[])
+  const pattern = new RegExp(`^video-\\d{8}T\\d{6}-${suffix}\\.${extension.slice(1)}$`)
+  const matches = names.filter(name => pattern.test(name))
+  return matches.length === 1 ? matches[0] : undefined
+}
+
 /** Serve the clip (or thumbnail) of one job, or a named file in the directory. */
 export async function serveJobFile(req: IncomingMessage, res: ServerResponse, options: {
   dir: string
@@ -210,17 +227,23 @@ export async function serveJobFile(req: IncomingMessage, res: ServerResponse, op
   if (jobId.length > 0) {
     const record = options.store.get(jobId)
     if (record === undefined) {
-      jsonError(res, 404, 'unknown_job', `this host does not track job ${jobId}; the clip is only served while the job stays in the local history.`)
-      return
+      // The history may have been lost (another host overwrote it) while the
+      // clip is still on disk; the job id's suffix identifies the file.
+      file = await fileForJobSuffix(options.dir, jobId, options.kind === 'video' ? '.mp4' : '.jpg')
+      if (file === undefined) {
+        jsonError(res, 404, 'unknown_job', `this host does not track job ${jobId}, and no stored clip in this directory matches it; generate the clip again.`)
+        return
+      }
+    } else {
+      const stored = options.kind === 'video' ? record.videoFile : record.thumbFile
+      if (stored === undefined) {
+        jsonError(res, 404, options.kind === 'video' ? 'not_ready' : 'no_thumbnail', options.kind === 'video'
+          ? 'this job has no stored clip yet; it is still rendering or the download failed.'
+          : 'this job has no stored thumbnail; set saveThumbnail in Settings > Plugins > Video generation to keep one.')
+        return
+      }
+      file = stored.split(/[\\/]/).pop()
     }
-    const stored = options.kind === 'video' ? record.videoFile : record.thumbFile
-    if (stored === undefined) {
-      jsonError(res, 404, options.kind === 'video' ? 'not_ready' : 'no_thumbnail', options.kind === 'video'
-        ? 'this job has no stored clip yet; it is still rendering or the download failed.'
-        : 'this job has no stored thumbnail; set saveThumbnail in Settings > Plugins > Video generation to keep one.')
-      return
-    }
-    file = stored.split(/[\\/]/).pop()
   } else {
     file = query?.get('name')?.trim()
   }

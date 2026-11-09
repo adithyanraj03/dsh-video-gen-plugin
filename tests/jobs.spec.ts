@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -166,5 +166,38 @@ describe('VideoJobStore', () => {
     const outcome = await store.waitFor('video_abc', 5_000)
     expect(calls).toBe(1)
     expect(outcome.record.savedTo).toBe(join(dir, 'copy.mp4'))
+  })
+
+  it('keeps another host\'s history when it persists (the desktop app and dsh web share one folder)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'video-jobs-'))
+    const { client } = fakeClient(['completed'])
+    // A clip another host finished and wrote, before this host ever loaded.
+    const foreign = { ...record({ id: 'video_other', status: 'completed', videoFile: join(dir, 'video-19700121T182340-8917aa0e.mp4') }), createdAt: 9_000 }
+    await writeFile(join(dir, 'jobs.json'), JSON.stringify({ version: 1, jobs: [foreign] }))
+
+    const store = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
+    await store.submit({ model: 'ltx-2.5', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
+    await store.waitFor('video_abc', 5_000)
+
+    const history = JSON.parse(await readFile(join(dir, 'jobs.json'), 'utf8')) as { jobs: VideoJobRecord[] }
+    const ids = history.jobs.map(job => job.id).sort()
+    expect(ids).toEqual(['video_abc', 'video_other'])
+    // The foreign record is written back verbatim, so its clip stays addressable.
+    expect(history.jobs.find(job => job.id === 'video_other')?.videoFile).toBe(foreign.videoFile)
+  })
+
+  it('never leaves an empty history behind after a restart', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'video-jobs-'))
+    const { client } = fakeClient(['completed'])
+    const first = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
+    await first.submit({ model: 'ltx-2.5', prompt: 'p', seconds: 5, size: '1280x704', enhance: false })
+    await first.waitFor('video_abc', 5_000)
+
+    // A second process starts cold and writes before reading: the merge keeps the clip.
+    const second = new VideoJobStore({ dir, client: async () => client, sleep: noSleep })
+    await second.submit({ model: 'ltx-2.5', prompt: 'q', seconds: 5, size: '1280x704', enhance: false })
+    const history = JSON.parse(await readFile(join(dir, 'jobs.json'), 'utf8')) as { jobs: VideoJobRecord[] }
+    expect(history.jobs.some(job => job.id === 'video_abc')).toBe(true)
+    expect(history.jobs.length).toBeGreaterThan(0)
   })
 })

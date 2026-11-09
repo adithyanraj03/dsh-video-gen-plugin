@@ -12,7 +12,7 @@ Video generation for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-
 | Start frame | Pass `image_url`, `source_attachment_id` (an image already in the chat), or `source_path` (a file in the session workspace). That picture becomes the clip's **first frame**. |
 | `check_video` | One job by id, or the recent list. Also adopts a job id this host never saw by asking the server. |
 | `cancel_video` | Stops a queued or running render so the GPU frees up. |
-| Tool card | The finished MP4 plays inline with native controls and seeks via `Range` requests; while rendering, the same card shows progress, stage, and queue position. |
+| Tool card | The finished MP4 plays inline with native controls and seeks via `Range` requests; while rendering, the card shows the NInfer "being made" sheet — ripples, plain-words stage, percent, and time — with a cancel button, and ripples the first frame in when the clip is ready. |
 
 Long renders do not hold the conversation: `generate_video` waits for `waitGraceMs` (default 2 minutes) and then returns the job id. Use `wait: "until_done"` to block for the whole render, or `wait: "none"` to return immediately.
 
@@ -97,6 +97,50 @@ Fields sent on submit: `model`, `prompt`, `seconds` (as a string), `size` (`WxH`
 3. On completion the MP4 is streamed (bounded by `maxVideoBytes`), written atomically, and the thumbnail is fetched.
 4. A finished clip is copied into the session workspace exactly once; job history is kept in `jobs.json` next to the clips (last 50 by default).
 
+## The render card (NInfer sheet)
+
+While a job is queued or rendering, the tool card draws the NInfer Monitor's
+"video being made" panel — a faithful port of `ninfer_monitor/web/ui-video.js`
+(spec: `vid-gen-panel.md` in this repo) into `src/client/video-panel.ts`:
+
+- **The sheet** — one WebGL pass: ripples start at uneven times and places and
+  bend everything on the sheet, its words included; smoke curls under misty
+  glass; a tiny crosshatch mesh lifts white only where a ripple passes. The
+  sheet shows the stage in plain words, the percent, the time since the job
+  was created, and a progress bar along the bottom edge.
+- **The reveal** — when the clip is ready, a slow wave from the centre brings
+  up its first frame; the sheet then hands over to a `<video>` player with
+  native controls on that frame. A fresh `generate_video` autoplays **muted**
+  (browsers refuse an audible autoplay, and a clip that starts talking on its
+  own is rude — the native controls unmute it); a `check_video` that finds an
+  already-finished job ripples it in paused.
+- **The progress log** — the line under the sheet follows the NInfer log
+  format, `<describe(job)> · <seconds since creation>` ("84% · Generating the
+  frames · 14 s"), refreshed on every 2 s poll so a cold start never reads as
+  frozen. Above it sits the `size · Ns · seed N` row with a **✕ Cancel**
+  button (posts to the plugin's cancel route) and the `Processing…` row with
+  the model chip.
+- **Failures** — the sheet greys with a `✕` (cancelled) or `⚠️` and the
+  reason; the tool text below carries the same detail.
+- **The wait grace** — while `generate_video` is still holding the turn (its
+  `wait` grace, up to the render), the harness has no result metadata yet, so
+  the card drives the sheet from the call arguments and follows the real job
+  by its prompt (same 2 s poll as after the result lands): percent, stage,
+  the ✕ Cancel button, and the reveal all behave identically.
+- **Promoted result** — on hosts with the `uiConversation` service (the
+  promoted-result mechanism dsh-image-gen uses), a settled `generate_video`
+  result becomes a session-located chat row (kind `dsh-video-result`) that
+  stays visible even when the Tool process folds — the same "final image"
+  behaviour the image plugin has. The tool card then shows only
+  "Video is shown in the conversation". `check_video`/`cancel_video` and
+  legacy hosts without the service keep the full card inside the tool call.
+
+The raw stage vocabulary is translated by the same rules as the NInfer page
+(`Pausing the language model`, `Loading the models`, `Generating the frames`,
+`Saving the video`, …); an unknown stage is shown verbatim. Without WebGL a
+static CSS sheet with the same words is shown instead, and with the system's
+"Reduce Motion" setting the water stands still.
+
 ## Browser routes
 
 Served same-origin by the plugin, gated by the harness connection trust decision:
@@ -117,12 +161,12 @@ Served same-origin by the plugin, gated by the harness connection trust decision
 ```powershell
 pnpm run typecheck   # tsc --noEmit
 pnpm run build       # clean lib/, ts scoped to lib/types, tsdown host + client bundles
-pnpm run test        # vitest: 111 cases
+pnpm run test        # vitest: 142 cases
 pnpm run test:package
 pnpm run pack:check
 ```
 
-Layout: `src/*.ts` is the host fiber (`index.ts` registers the tools and routes), `src/client/` is the browser bundle (the settings card and the tool result card), `tests/` covers the pure parts and the HTTP surfaces. `lib/index.js` and `lib/client.js` are build outputs and are not committed. The icon is rendered deterministically by `scripts/make-icon.py` (Pillow, no network) and then masked by the harness icon pipeline into `assets/icon.png`.
+Layout: `src/*.ts` is the host fiber (`index.ts` registers the tools and routes), `src/client/` is the browser bundle (the settings card, the tool result card, and the `dsh-video-result` conversation node), `tests/` covers the pure parts and the HTTP surfaces. `lib/index.js` and `lib/client.js` are build outputs and are not committed. The icon is artwork from the image-gen tool, framed and masked by the `make_icon` pipeline into `assets/icon.png` (a deterministic fallback exists in `scripts/make-icon.py`).
 
 ## Limits and known behaviour
 
@@ -131,13 +175,15 @@ Layout: `src/*.ts` is the host fiber (`index.ts` registers the tools and routes)
 - A start frame without an explicit `size` picks the box orientation from the picture's aspect ratio.
 - `image_url` is fetched by the host, so an authenticated or local-only URL will not work — use `source_attachment_id` or `source_path` instead.
 - Without a web profile the tools still run, but no card, no progress, and no settings form.
-- A restarted server forgets job ids; `check_video` then reports the 404 verbatim so the fix ("submit again") is obvious.
-- The desktop app and `dsh web` can both load this plugin, but they share one clip directory and each keeps its own `jobs.json`, so they overwrite each other's history. Point `videosDir` at a separate folder per host when you run both.
+- A restarted server forgets job *ids* it was tracking only if the history file was lost; clip files stay addressable anyway, because a job id's last eight hex characters name its file.
+- The desktop app and `dsh web` can both load this plugin and share one clip directory. Each keeps its own `jobs.json`, so they used to overwrite each other's history; the history is now written merge-safe, and the clip routes find a file by its job-id suffix when a record is missing. Point `videosDir` at a separate folder per host when you run both anyway.
 
 ## Compatibility
 
 | dsh-video-gen | DeepSeek Harness | Notes |
 | --- | --- | --- |
+| 0.2.1 | 0.1.7-rc.2 | The sheet now also renders during the `generate_video` wait grace, tracking the real job through the host's own selection rule (prompt match, else a single active job), so percent and stage move instead of freezing at 0%; the water/ripples/words actually draw, the words follow every poll (they live in the sheet texture), and a progress log under the sheet keeps one line per distinct engine answer; a settled generate result is promoted to a session-located chat row (kind `dsh-video-result`) that appears while the turn is still running and survives Tool-process folding; clip history is written merge-safe and the clip routes fall back to the job id's file suffix, so a restart or a second host sharing the folder no longer leaves old clips unplayable. |
+| 0.2.0 | 0.1.7-rc.2 | NInfer "being made" sheet, first-frame reveal, and cancel button in the render card; `check_video` with one job shows the same card; `createdAt` (epoch ms) on the tool output. |
 | 0.1.0 | 0.1.7-rc.2 | Settings card renders on `plugins.bundle.config`; the legacy `settings.plugin.item` seat is kept for hosts at or below 0.1.5. Schema uses the 0.1.7 volatile form with the `installSection` relay as fallback. |
 
 ## License

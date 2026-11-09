@@ -79,6 +79,8 @@ interface VideoResult {
   seed?: number
   fromPicture: boolean
   waitedMs: number
+  /** Epoch milliseconds; the render card clocks the sheet from it. */
+  createdAt: number
   videoPath?: string
   thumbPath?: string
   videoBytes?: number
@@ -145,6 +147,7 @@ function toResult(record: VideoJobRecord, waitedMs: number): VideoResult {
     ...(record.seed === undefined ? {} : { seed: record.seed }),
     fromPicture: record.fromPicture,
     waitedMs,
+    createdAt: record.createdAt,
     ...(record.videoFile === undefined ? {} : { videoPath: record.videoFile }),
     ...(record.thumbFile === undefined ? {} : { thumbPath: record.thumbFile }),
     ...(record.videoBytes === undefined ? {} : { videoBytes: record.videoBytes }),
@@ -169,6 +172,7 @@ const VIDEO_OUTPUT_PROPERTIES = {
   seed: { type: 'integer' },
   fromPicture: { type: 'boolean', required: true },
   waitedMs: { type: 'integer', required: true },
+  createdAt: { type: 'integer', required: true },
   videoPath: { type: 'string' },
   thumbPath: { type: 'string' },
   videoBytes: { type: 'integer' },
@@ -303,8 +307,13 @@ export function apply(ctx: Context, config: Config = {}): void {
         jobId: value.jobId,
         status: value.status,
         prompt: value.prompt,
+        model: value.model,
         seconds: value.seconds,
         size: value.size,
+        createdAt: value.createdAt,
+        ...(value.seed === undefined ? {} : { seed: value.seed }),
+        ...(value.stage === undefined ? {} : { stage: value.stage }),
+        ...(value.queuePosition === undefined ? {} : { queuePosition: value.queuePosition }),
         ...(value.videoPath === undefined ? {} : { videoName: fileBase(value.videoPath) }),
         ...(value.thumbPath === undefined ? {} : { thumbName: fileBase(value.thumbPath) }),
         ...(value.savedTo === undefined ? {} : { savedTo: value.savedTo }),
@@ -389,19 +398,45 @@ export function apply(ctx: Context, config: Config = {}): void {
       render: (_args: unknown, value: { jobs: VideoResult[] }) => [
         { type: 'text' as const, text: value.jobs.length === 0 ? 'No video jobs are recorded on this host yet.' : value.jobs.map(renderVideoResult).join('\n\n') },
       ],
-      presentationMeta: (_args: unknown, value: { jobs: VideoResult[] }) => ({
-        kind: 'dsh-video-gen-list',
-        jobs: value.jobs.map(job => ({
-          jobId: job.jobId,
-          status: job.status,
-          prompt: job.prompt,
-          seconds: job.seconds,
-          size: job.size,
-          ...(job.videoPath === undefined ? {} : { videoName: fileBase(job.videoPath) }),
-          ...(job.thumbPath === undefined ? {} : { thumbName: fileBase(job.thumbPath) }),
-          ...(job.error === undefined ? {} : { error: job.error }),
-        })),
-      }),
+      presentationMeta: (_args: unknown, value: { jobs: VideoResult[] }) => {
+        // One job gets the same render card as generate_video, so a followed-up
+        // clip keeps its sheet; a list stays a compact row per job.
+        const first = value.jobs.length === 1 ? value.jobs[0] : undefined
+        if (first !== undefined) {
+          return {
+            kind: 'dsh-video-gen-check',
+            jobId: first.jobId,
+            status: first.status,
+            prompt: first.prompt,
+            model: first.model,
+            seconds: first.seconds,
+            size: first.size,
+            createdAt: first.createdAt,
+            ...(first.seed === undefined ? {} : { seed: first.seed }),
+            ...(first.stage === undefined ? {} : { stage: first.stage }),
+            ...(first.queuePosition === undefined ? {} : { queuePosition: first.queuePosition }),
+            ...(first.videoPath === undefined ? {} : { videoName: fileBase(first.videoPath) }),
+            ...(first.thumbPath === undefined ? {} : { thumbName: fileBase(first.thumbPath) }),
+            ...(first.savedTo === undefined ? {} : { savedTo: first.savedTo }),
+            ...(first.error === undefined ? {} : { error: first.error }),
+          }
+        }
+        return {
+          kind: 'dsh-video-gen-list',
+          jobs: value.jobs.map(job => ({
+            jobId: job.jobId,
+            status: job.status,
+            prompt: job.prompt,
+            model: job.model,
+            seconds: job.seconds,
+            size: job.size,
+            createdAt: job.createdAt,
+            ...(job.videoPath === undefined ? {} : { videoName: fileBase(job.videoPath) }),
+            ...(job.thumbPath === undefined ? {} : { thumbName: fileBase(job.thumbPath) }),
+            ...(job.error === undefined ? {} : { error: job.error }),
+          })),
+        }
+      },
     },
     async execute(args, exec): Promise<{ jobs: VideoResult[] }> {
       noteSession(exec)
@@ -457,12 +492,14 @@ export function apply(ctx: Context, config: Config = {}): void {
       schema: { type: 'object', additionalProperties: false, properties: VIDEO_OUTPUT_PROPERTIES },
       render: (_args: unknown, value: VideoResult) => [{ type: 'text' as const, text: value.status === 'cancelled' ? `Cancelled video job ${value.jobId}.` : renderVideoResult(value) }],
       presentationMeta: (_args: unknown, value: VideoResult) => ({
-        kind: 'dsh-video-gen',
+        kind: 'dsh-video-gen-cancel',
         jobId: value.jobId,
         status: value.status,
         prompt: value.prompt,
+        model: value.model,
         seconds: value.seconds,
         size: value.size,
+        createdAt: value.createdAt,
         ...(value.videoPath === undefined ? {} : { videoName: fileBase(value.videoPath) }),
         ...(value.savedTo === undefined ? {} : { savedTo: value.savedTo }),
         ...(value.error === undefined ? {} : { error: value.error }),

@@ -126,6 +126,22 @@ describe('serveJobFile', () => {
     expect(noClip.status).toBe(404)
   })
 
+  it('finds the clip by the job id suffix when the history lost the record', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'video-route-'))
+    await writeFile(join(dir, 'video-20260101T000000-abcdef12.mp4'), Uint8Array.from([7, 8, 9]))
+    // A wiped history (another host overwrote jobs.json) leaves the store empty.
+    const store = { get: () => undefined }
+    const base = await serve((req, res) => serveJobFile(req, res, { dir, kind: 'video', store }))
+    const recovered = await fetch(`${base}/clip?job=video_9f8e7d6cabcdef12`)
+    expect(recovered.status).toBe(200)
+    expect([...new Uint8Array(await recovered.arrayBuffer())]).toEqual([7, 8, 9])
+
+    // A job id whose suffix matches nothing stays an honest 404.
+    const gone = await fetch(`${base}/clip?job=video_9f8e7d6c00112233`)
+    expect(gone.status).toBe(404)
+    expect((await gone.json() as { error: string }).error).toBe('unknown_job')
+  })
+
   it('explains a job that has no thumbnail yet', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'video-route-'))
     const store = { get: () => ({ videoFile: undefined }) }

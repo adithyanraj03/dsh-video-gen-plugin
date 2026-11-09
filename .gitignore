@@ -10,3 +10,14 @@ assets/icon-source.png
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+vid-gen-panel.md
+
+# Panel QA harness build output (tools/make-panel-test.ps1 regenerates it).
+tools/qa/
+
+# Harness bundles extracted from app.asar while reading its contracts.
+tools/asar-x/
+
+# Clips the plugin copies into this workspace after a render.
+/video-*.mp4
+/video-*.jpg

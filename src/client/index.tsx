@@ -3,7 +3,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
 import { VIDEO_GENERATION_NAMESPACE, type SettingsHealth } from '../shared.js'
 import { VideoSettingsCard, type SettingsScope, type VideoSettings } from './settings-card.js'
-import { VideoResultCard, languageOf, type VideoCardFace } from './video-toolview.js'
+import { PromotedVideoResultNode, VideoResultCard, languageOf, type VideoCardFace } from './video-toolview.js'
+import { VIDEO_RESULT_NODE_KIND, createVideoResultDefinition } from './video-result-node.js'
 
 export { VideoResultCard } from './video-toolview.js'
 export { VideoSettingsCard } from './settings-card.js'
@@ -13,6 +14,27 @@ export const inject = ['slots', 'locale']
 
 /** Every tool name that renders the result card, including the prefixed family. */
 const TOOL_KEYS = ['generate_video', 'check_video', 'cancel_video', 'videogen_generate_video', 'videogen_check_video', 'videogen_cancel_video'] as const
+
+/** Tool names that start a render; their settled results promote to a chat row. */
+const GENERATE_KEYS = new Set<string>(['generate_video', 'videogen_generate_video'])
+
+/**
+ * Runtime face of DSH's `uiConversation` service (the promoted-result
+ * mechanism). Kept local and duck-typed: hosts without the service never
+ * reach this code (deferred inject).
+ */
+interface ModernUiConversation {
+  events: { register(definition: ReturnType<typeof createVideoResultDefinition>): () => void }
+}
+
+function asModernUiConversation(value: unknown): ModernUiConversation | undefined {
+  const candidate = value as { events?: { register?: unknown } } | null
+  if (candidate === null || typeof candidate !== 'object') return undefined
+  if (typeof candidate.events?.register !== 'function') return undefined
+  return candidate as unknown as ModernUiConversation
+}
+
+type SlotInject = (key: string, factory: () => () => void) => void
 
 /** Read-only view of the host's settings scope for this plugin's entry. */
 interface ConfigFormsApi {
@@ -73,11 +95,40 @@ export function apply(ctx: Context): void {
     inject: () => ({ scope, health: health() }),
   }, VideoSettingsCard)
 
+  // Promoted results: on hosts with the uiConversation service, a settled
+  // generate_video result becomes a session-located chat row (kind
+  // dsh-video-result) and stays visible when the Tool process folds. The
+  // generate tool cards then carry a short notice. Legacy hosts never reach
+  // this code and keep the full card inside the tool call.
+  const promotion = { enabled: false }
+  ;(ctx.inject as unknown as (services: string[], callback: (owner: Context) => void) => void)(
+    ['uiConversation'],
+    owner => {
+      const uiConversation = asModernUiConversation(owner.get('uiConversation'))
+      if (uiConversation === undefined) {
+        throw new Error('dsh-video-gen: uiConversation has an incompatible interface')
+      }
+      promotion.enabled = true
+      const ownerRegister = owner.slots.register.bind(owner.slots) as unknown as (options: object, component: unknown) => () => void
+      owner.effect(
+        () => uiConversation.events.register(createVideoResultDefinition()),
+        'dsh-video-gen: promoted video result node',
+      )
+      ;(owner.slots.inject as unknown as SlotInject)('conversation.chat.node', () => ownerRegister({
+        name: 'conversation.chat.node',
+        key: VIDEO_RESULT_NODE_KIND,
+        inject: () => ({ lang: language() }),
+      }, PromotedVideoResultNode))
+    },
+  )
+
   for (const key of TOOL_KEYS) {
     tryRegister('tool.call.toolview', {
       name: 'tool.call.toolview',
       key,
-      inject: (): VideoCardFace => ({ lang: language() }),
+      inject: (): VideoCardFace => GENERATE_KEYS.has(key)
+        ? { lang: language(), promoted: promotion.enabled }
+        : { lang: language() },
     }, VideoResultCard)
   }
 }

@@ -21,7 +21,7 @@ import {
   type VideoJobRecord,
   type VideoJobView,
 } from './shared.js'
-import { cancelVideo, createVideo, describeJobFailure, downloadContent, getVideo, pollDelay, type ReferenceImage, type RemoteVideoJob, type VideoApiClient } from './video-api.js'
+import { cancelVideo, createVideo, describeJobFailure, downloadContent, getVideo, pollDelay, toEpochMs, type ReferenceImage, type RemoteVideoJob, type VideoApiClient } from './video-api.js'
 
 /** Everything needed to queue one clip. */
 export interface SubmitRequest {
@@ -185,48 +185,63 @@ export class VideoJobStore {
   async load(): Promise<void> {
     if (this.loaded) return
     this.loaded = true
+    for (const raw of await this.readRawHistory()) {
+      const id = raw.id
+      if (typeof id !== 'string' || this.records.has(id)) continue
+      this.records.set(id, this.normalize(raw))
+    }
+  }
+
+  /**
+   * Read `jobs.json` as stored, without touching live state. `persist()` needs
+   * the other host's records verbatim; `load()` normalizes them afterwards.
+   */
+  private async readRawHistory(): Promise<Partial<VideoJobRecord>[]> {
     try {
       const raw = await readFile(join(this.dir, HISTORY_FILE), 'utf8')
       const parsed = JSON.parse(raw) as { jobs?: unknown }
       const jobs = Array.isArray(parsed.jobs) ? parsed.jobs : []
-      for (const item of jobs) {
-        const record = item as Partial<VideoJobRecord>
-        if (typeof record?.id !== 'string' || record.id.length === 0) continue
-        const status: JobStatus = isTerminalStatus((record.status ?? 'interrupted') as JobStatus)
-          ? (record.status as JobStatus)
-          : 'interrupted'
-        this.records.set(record.id, {
-          id: record.id,
-          provider: record.provider ?? 'video',
-          model: record.model ?? '',
-          prompt: record.prompt ?? '',
-          status,
-          progress: typeof record.progress === 'number' ? record.progress : 0,
-          ...(record.stage === undefined ? {} : { stage: record.stage }),
-          ...(record.queuePosition === undefined ? {} : { queuePosition: record.queuePosition }),
-          seconds: typeof record.seconds === 'number' ? record.seconds : 5,
-          size: record.size ?? '1280x704',
-          ...(record.fps === undefined ? {} : { fps: record.fps }),
-          ...(record.seed === undefined ? {} : { seed: record.seed }),
-          enhance: record.enhance === true,
-          ...(record.negativePrompt === undefined ? {} : { negativePrompt: record.negativePrompt }),
-          fromPicture: record.fromPicture === true,
-          createdAt: typeof record.createdAt === 'number' ? record.createdAt : this.now(),
-          updatedAt: typeof record.updatedAt === 'number' ? record.updatedAt : this.now(),
-          ...(record.completedAt === undefined ? {} : { completedAt: record.completedAt }),
-          ...(record.videoFile === undefined ? {} : { videoFile: record.videoFile }),
-          ...(record.thumbFile === undefined ? {} : { thumbFile: record.thumbFile }),
-          ...(record.videoBytes === undefined ? {} : { videoBytes: record.videoBytes }),
-          ...(record.savedTo === undefined ? {} : { savedTo: record.savedTo }),
-          ...(record.thumbSavedTo === undefined ? {} : { thumbSavedTo: record.thumbSavedTo }),
-          ...(record.error === undefined ? {} : { error: record.error }),
-          ...(record.errorCode === undefined ? {} : { errorCode: record.errorCode }),
-        })
-      }
+      return jobs.filter((item): item is Partial<VideoJobRecord> =>
+        typeof (item as { id?: unknown })?.id === 'string' && ((item as { id: string }).id).length > 0)
     } catch (error) {
       if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
         this.log(`video job history could not be read: ${error instanceof Error ? error.message : String(error)}`)
       }
+      return []
+    }
+  }
+
+  /** Turn one stored record into a live one; leftovers from a dead host read as `interrupted`. */
+  private normalize(record: Partial<VideoJobRecord>): VideoJobRecord {
+    const status: JobStatus = isTerminalStatus((record.status ?? 'interrupted') as JobStatus)
+      ? (record.status as JobStatus)
+      : 'interrupted'
+    return {
+      id: record.id as string,
+      provider: record.provider ?? 'video',
+      model: record.model ?? '',
+      prompt: record.prompt ?? '',
+      status,
+      progress: typeof record.progress === 'number' ? record.progress : 0,
+      ...(record.stage === undefined ? {} : { stage: record.stage }),
+      ...(record.queuePosition === undefined ? {} : { queuePosition: record.queuePosition }),
+      seconds: typeof record.seconds === 'number' ? record.seconds : 5,
+      size: record.size ?? '1280x704',
+      ...(record.fps === undefined ? {} : { fps: record.fps }),
+      ...(record.seed === undefined ? {} : { seed: record.seed }),
+      enhance: record.enhance === true,
+      ...(record.negativePrompt === undefined ? {} : { negativePrompt: record.negativePrompt }),
+      fromPicture: record.fromPicture === true,
+      createdAt: (typeof record.createdAt === 'number' ? toEpochMs(record.createdAt) : undefined) ?? this.now(),
+      updatedAt: typeof record.updatedAt === 'number' ? record.updatedAt : this.now(),
+      ...(record.completedAt === undefined ? {} : { completedAt: record.completedAt }),
+      ...(record.videoFile === undefined ? {} : { videoFile: record.videoFile }),
+      ...(record.thumbFile === undefined ? {} : { thumbFile: record.thumbFile }),
+      ...(record.videoBytes === undefined ? {} : { videoBytes: record.videoBytes }),
+      ...(record.savedTo === undefined ? {} : { savedTo: record.savedTo }),
+      ...(record.thumbSavedTo === undefined ? {} : { thumbSavedTo: record.thumbSavedTo }),
+      ...(record.error === undefined ? {} : { error: record.error }),
+      ...(record.errorCode === undefined ? {} : { errorCode: record.errorCode }),
     }
   }
 
@@ -453,12 +468,23 @@ export class VideoJobStore {
 
   /** Rewrite the history file, keeping the newest `history` records. */
   private async persist(): Promise<void> {
-    const jobs = this.list(this.options.history)
-    const payload = JSON.stringify({ version: 1, jobs })
+    const mine = this.list(this.options.history)
     const file = join(this.dir, HISTORY_FILE)
     try {
       await mkdir(this.dir, { recursive: true })
-      await writeFile(`${file}.tmp`, payload)
+      // More than one host can share this directory (the desktop app and
+      // `dsh web` both load this plugin, and a restart can overlap with the
+      // previous process's last write), each keeping its own in-memory list
+      // over one file. Merge what is on disk so neither process wipes the
+      // other's history — a wipe leaves the clips unaddressable, because the
+      // routes resolve a job id through this file.
+      const merged = new Map<string, Partial<VideoJobRecord>>()
+      for (const record of await this.readRawHistory()) merged.set(record.id as string, record)
+      for (const record of mine) merged.set(record.id, record)
+      const jobs = [...merged.values()]
+        .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+        .slice(0, this.options.history)
+      await writeFile(`${file}.tmp`, JSON.stringify({ version: 1, jobs }))
       await rename(`${file}.tmp`, file)
     } catch (error) {
       this.log(`video job history could not be written: ${error instanceof Error ? error.message : String(error)}`)

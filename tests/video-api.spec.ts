@@ -118,7 +118,7 @@ describe('parseJob', () => {
       size: '1280x704', seed: 11, queuePosition: 2, stage: 'render', fromPicture: true,
     })
     expect(job.timing).toEqual({ render_s: 12.5 })
-    expect(job.createdAt).toBe(1_700_000_000)
+    expect(job.createdAt).toBe(1_700_000_000_000)
   })
 
   it('keeps a failed job error readable', () => {

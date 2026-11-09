@@ -254,6 +254,17 @@ function decodeNumber(value: unknown): number | undefined {
   return undefined
 }
 
+/**
+ * `created_at` is epoch seconds on the OpenAI-style wire, while every local
+ * record (and the toolview's freshness filter) uses epoch milliseconds.
+ * Between 1e9 and 1e12 a value is a plausible date only in seconds (2001
+ * onward), so scale it; anything else is passed through unchanged.
+ */
+export function toEpochMs(value: number | undefined): number | undefined {
+  if (value === undefined || !Number.isFinite(value)) return undefined
+  return value >= 1e9 && value < 1e12 ? Math.round(value * 1000) : value
+}
+
 /** Decode one job payload; a payload without an id is not a job. */
 export function parseJob(payload: unknown): RemoteVideoJob {
   const record = typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {}
@@ -266,7 +277,7 @@ export function parseJob(payload: unknown): RemoteVideoJob {
     const number = decodeNumber(value)
     if (number !== undefined) timing[key] = number
   }
-  const createdAt = decodeNumber(record.created_at)
+  const createdAt = toEpochMs(decodeNumber(record.created_at))
   const job: RemoteVideoJob = {
     id,
     status: typeof record.status === 'string' ? record.status : 'queued',
