@@ -1,6 +1,6 @@
 {
   "name": "dsh-video-gen-plugin",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Bring-your-own video endpoint for DeepSeek Harness: text-to-video and image-to-video with inline playback, live progress, and cancel.",
   "type": "module",
   "author": "Adithya N Raj",

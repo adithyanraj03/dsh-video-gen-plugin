@@ -39,7 +39,8 @@ const client: UserConfig = {
   },
   outputOptions: {
     entryFileNames: 'client.js',
-    banner: 'window.__ModuleLoader__.load({ id: "dsh-video-gen", factory: (require) => {',
+    // The loader looks the factory up by the package name; any other id fails to mount.
+    banner: 'window.__ModuleLoader__.load({ id: "dsh-video-gen-plugin", factory: (require) => {',
     footer: 'return module.exports; } });',
     intro: 'var module = { exports: {} }; var exports = module.exports;',
   },

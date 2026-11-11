@@ -36,7 +36,8 @@ for (const file of ['lib/index.js', 'lib/client.js', 'lib/types/index.d.ts']) {
 // 3. The client bundle is wrapped for the DSH module loader.
 const client = await readFile(join(root, 'lib', 'client.js'), 'utf8')
 check(client.includes('__ModuleLoader__'), 'lib/client.js is not wrapped in window.__ModuleLoader__.load')
-check(client.includes('dsh-video-gen'), 'lib/client.js must name its module id')
+// The id must equal the package name exactly: dsh mounts the client by package name.
+check(client.includes(`id: "${pkg.name}"`), `lib/client.js must register its module id as "${pkg.name}"`)
 check(/jsx|createElement/.test(client), 'lib/client.js contains no React output')
 
 // 4. Pack and inspect the tarball contents.
@@ -65,7 +66,7 @@ try {
 
 // 5. The bundle patch must name this package exactly once, with the documented id.
 const patch = await readFile(join(root, 'cordis.patch.yml'), 'utf8')
-check(patch.includes('name: dsh-video-gen'), 'cordis.patch.yml must insert a row named dsh-video-gen')
+check(/^\s*name: ['"]?dsh-video-gen-plugin['"]?\s*$/m.test(patch), 'cordis.patch.yml must insert a row named dsh-video-gen-plugin')
 check((patch.match(/^\s*- id:/gm) ?? []).length === 1, 'cordis.patch.yml must insert exactly one row')
 
 if (failures.length > 0) {
